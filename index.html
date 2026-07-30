@@ -10318,12 +10318,17 @@
       const cnt = trReportElecRowCount(spec);
       for (let r = 1; r <= cnt; r++) { const g = trReportElecConverted(spec, r, sampleInfoMap); if (Number.isFinite(g)) gVals.push(g); }
 
+      const condMinV = hVals.length ? Math.min(...hVals) : null;
       const condMaxV = hVals.length ? Math.max(...hVals) : null;
       const capMaxV = iVals.length ? Math.max(...iVals) : null;
       const pdMinV = jVals.length ? Math.min(...jVals) : null;
       const pdMaxV = jVals.length ? Math.max(...jVals) : null;
       const dielMaxV = kVals.length ? Math.max(...kVals) : null;
-      const condRes = condMaxV != null ? trReportNumberString(condMaxV, { digits: 5 }) : "-";
+      const condRes = condMaxV == null
+        ? "-"
+        : hVals.length > 1
+          ? `${trReportNumberString(condMinV, { digits: 5 })}~${trReportNumberString(condMaxV, { digits: 5 })}`
+          : trReportNumberString(condMaxV, { digits: 5 });
       const capRes = trReportElecSummaryText(sampleInfoMap.I, capMaxV != null ? trReportNumberString(capMaxV, { digits: 3 }) : "-");
       const pdRes = trReportElecSummaryText(sampleInfoMap.J, pdMaxV == null
         ? "-"
