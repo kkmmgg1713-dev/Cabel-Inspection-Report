@@ -7298,9 +7298,8 @@
       const averageMinimum = trStructureAverageMinimum(getTRStructureCriteria(), row.id);
       if (averageMinimum != null) {
         if (!nums.length) return "-";
-        const minimum = Math.min(...nums);
         const average = nums.reduce((sum, value) => sum + value, 0) / nums.length;
-        return `최소 ${trFmt(minimum)} / 평균 ${trFmt(average)}`;
+        return trFmt(average);
       }
       if (row.result === "max") return nums.length ? trFmt(Math.max(...nums)) : "-";
       if (row.result === "min") return nums.length ? trFmt(Math.min(...nums)) : "-";
@@ -10710,9 +10709,8 @@
       const averageMinimum = trStructureAverageMinimum(getTRStructureCriteria(), row.id);
       if (averageMinimum != null) {
         if (!nums.length) return "-";
-        const minimum = Math.min(...nums);
         const average = nums.reduce((sum, value) => sum + value, 0) / nums.length;
-        return `최소 ${trReportStructureNumberString(minimum, row)} / 평균 ${trReportStructureNumberString(average, row)}`;
+        return trReportStructureNumberString(average, row);
       }
       if (row.result === "max") return nums.length ? trReportStructureNumberString(Math.max(...nums), row) : "-";
       if (row.result === "min") return nums.length ? trReportStructureNumberString(Math.min(...nums), row) : "-";
