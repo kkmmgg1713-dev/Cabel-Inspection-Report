@@ -5088,13 +5088,13 @@
     // 절연저항: 환산치 ≥ insulationMin / 정전용량: 측정치 ≤ capacitanceMax
     // 도체저항: 측정치 ≤ 계약저항(입력값) / 부분방전 ≤ 10pC / 유전정접 ≤ 0.4%
     const TR_ELECTRICAL_LIMITS = {
-      "60mm2": { insulationMin: 3000, capacitanceMax: 0.21 },
-      "200mm2": { insulationMin: 2000, capacitanceMax: 0.32 },
-      "325mm2": { insulationMin: 2000, capacitanceMax: 0.36 },
-      "600mm2": { insulationMin: 1500, capacitanceMax: 0.47 },
-      "95mm2": { insulationMin: 3000, capacitanceMax: 0.21 },
-      "240mm2": { insulationMin: 2000, capacitanceMax: 0.32 },
-      "400mm2": { insulationMin: 2000, capacitanceMax: 0.36 },
+      "60mm2": { insulationMin: 3000, conductorMax: 0.305, capacitanceMax: 0.21 },
+      "200mm2": { insulationMin: 2000, conductorMax: 0.0915, capacitanceMax: 0.32 },
+      "325mm2": { insulationMin: 2000, conductorMax: 0.0568, capacitanceMax: 0.36 },
+      "600mm2": { insulationMin: 1500, conductorMax: 0.0308, capacitanceMax: 0.47 },
+      "95mm2": { insulationMin: 3000, conductorMax: 0.320, capacitanceMax: 0.21 },
+      "240mm2": { insulationMin: 2000, conductorMax: 0.125, capacitanceMax: 0.32 },
+      "400mm2": { insulationMin: 2000, conductorMax: 0.0778, capacitanceMax: 0.36 },
     };
     const FR_CNCO_ELECTRICAL_LIMITS = {
       "60mm2": { insulationMin: 3000, conductorMax: 0.305, capacitanceMax: 0.21 },
@@ -5130,7 +5130,7 @@
       if (trElectricalContractApplicable(spec, materialName)) {
         const raw = String(contractValue ?? "").trim();
         const contract = Number(raw);
-        return raw !== "" && Number.isFinite(contract) ? contract : null;
+        if (raw !== "" && Number.isFinite(contract) && contract > 0) return contract;
       }
       const limit = getTRElectricalLimits(spec, materialName)?.conductorMax;
       return Number.isFinite(limit) ? limit : null;
@@ -6097,6 +6097,11 @@
         ? String(container.querySelector("[data-tr-elec-contract]")?.value || "").trim()
         : "";
       const conductorLimit = trElectricalConductorLimit(spec, activeTRMaterial, contractRaw);
+      const contractInput = container.querySelector("[data-tr-elec-contract]");
+      if (contractInput) {
+        const contractValue = Number(contractRaw);
+        contractInput.classList.toggle("tr-electric-bad", contractRaw !== "" && (!Number.isFinite(contractValue) || contractValue <= 0));
+      }
 
       container.querySelectorAll("[data-tr-elec-row]").forEach(input => {
         const col = input.dataset.trElecCol;
@@ -6341,7 +6346,7 @@
               <tr>
                 ${showContract ? `
                 <th>
-                  <span class="tr-electric-contract">(<input data-tr-elec-contract type="number" step="0.0001" inputmode="decimal" placeholder="계약저항 입력" value="${trAttr(trElectricalContractValue(spec))}" />Ω/km 이하)</span>
+                  <span class="tr-electric-contract">(<input data-tr-elec-contract type="number" min="0.0001" step="0.0001" inputmode="decimal" placeholder="계약저항 입력" value="${trAttr(trElectricalContractValue(spec))}" />Ω/km 이하)</span>
                 </th>` : ""}
               </tr>
             </thead>
@@ -6397,9 +6402,9 @@
       { id: "conductorWater", item: "도체 수밀", sub: "", criteria: "타 단에 누수 없을 것", type: "dropdown", pattern: "A" },
       { id: "tensileElongation", item: "인장강도 및 신율,\n신축변형", sub: "", criteria: "구매규격서 참조", type: "dropdown", pattern: "C" },
       { id: "ionicImpurity", item: "반도전층 이온성\n불순물", sub: "", criteria: "구매규격서 참조", type: "dropdown", pattern: "A" },
-      { id: "crosslinkInner", item: "가교도 시험", sub: "내도부위", criteria: "70% 이상", type: "dropdown", pattern: "C" },
-      { id: "crosslinkFiller", item: "가교도 시험", sub: "절연체 중간부위", criteria: "80% 이상", type: "dropdown", pattern: "C" },
-      { id: "crosslinkOuter", item: "가교도 시험", sub: "외도부위", criteria: "70% 이상", type: "dropdown", pattern: "C" },
+      { id: "crosslinkInner", item: "가교도 시험", sub: "내도부위", criteria: "70% 이상", type: "dropdown", pattern: "C", customNumericRules: [{ min: 70 }] },
+      { id: "crosslinkFiller", item: "가교도 시험", sub: "절연체 중간부위", criteria: "80% 이상", type: "dropdown", pattern: "C", customNumericRules: [{ min: 80 }] },
+      { id: "crosslinkOuter", item: "가교도 시험", sub: "외도부위", criteria: "70% 이상", type: "dropdown", pattern: "C", customNumericRules: [{ min: 70 }] },
       { id: "environmentCold", item: "내 환경성 시험", sub: "내한성(시스)", criteria: "시험편이 파괴되지 않을 것", type: "dropdown", pattern: "C" },
       {
         id: "environmentOil", item: "내 환경성 시험", sub: "내유성(시스)",
@@ -6408,13 +6413,13 @@
           { label: "인장강도", value: "침유전의 값의 80% 이상" },
           { label: "신장율", value: "침유전의 값의 60% 이상" },
         ],
-        type: "dropdown", pattern: "C",
+        type: "dropdown", pattern: "C", customNumericRules: [{ min: 80, labels: ["인장강도"] }, { min: 60, labels: ["신장율", "신율"] }],
       },
       { id: "environmentFlameSheath", item: "내 환경성 시험", sub: "난연성 (시스)", criteria: "불꽃이 상부 케이블의 Tray 전체 높이까지\n연소하지 않을 것", type: "dropdown", pattern: "A" },
-      { id: "environmentOxygenIndex", item: "내 환경성 시험", sub: "산소지수 (시스)", criteria: "30 이상", type: "dropdown", pattern: "A" },
-      { id: "environmentCorrosivity", item: "내 환경성 시험", sub: "연소가스부식성 (시스)", criteria: "PH 4.3 이상\n전도도 10μs/mm 이하", type: "dropdown", pattern: "A" },
-      { id: "environmentToxicity", item: "내 환경성 시험", sub: "무독성 (시스)", criteria: "HCl 함량 0.5% 이하", type: "dropdown", pattern: "A" },
-      { id: "environmentSmokeDensity", item: "내 환경성 시험", sub: "연기밀도(시스)", criteria: "빛투과율 60% 이상", type: "dropdown", pattern: "A" },
+      { id: "environmentOxygenIndex", item: "내 환경성 시험", sub: "산소지수 (시스)", criteria: "30 이상", type: "dropdown", pattern: "A", customNumericRules: [{ min: 30 }] },
+      { id: "environmentCorrosivity", item: "내 환경성 시험", sub: "연소가스부식성 (시스)", criteria: "PH 4.3 이상\n전도도 10μs/mm 이하", type: "dropdown", pattern: "A", customNumericRules: [{ min: 4.3, labels: ["PH"] }, { max: 10, labels: ["전도도"] }] },
+      { id: "environmentToxicity", item: "내 환경성 시험", sub: "무독성 (시스)", criteria: "HCl 함량 0.5% 이하", type: "dropdown", pattern: "A", customNumericRules: [{ max: 0.5 }] },
+      { id: "environmentSmokeDensity", item: "내 환경성 시험", sub: "연기밀도(시스)", criteria: "빛투과율 60% 이상", type: "dropdown", pattern: "A", customNumericRules: [{ min: 60 }] },
     ];
 
     function getTRPhysical1Rows(materialName = activeTRMaterial) {
@@ -7086,8 +7091,46 @@
       recalcTRPhysical1Validation();
     }
 
+    function trPhysical1CustomNumbers(value) {
+      const matches = String(value ?? "").replace(/,/g, "").match(/-?(?:\d+\.?\d*|\.\d+)/g) || [];
+      return matches.map(Number).filter(Number.isFinite);
+    }
+
+    function trPhysical1LabeledCustomNumber(custom, rule) {
+      if (!Array.isArray(rule?.labels)) return NaN;
+      for (const label of rule.labels) {
+        const escaped = String(label).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const match = String(custom).match(new RegExp(`${escaped}\\s*(?:[:=]|은|는)?\\s*(-?(?:\\d+\\.?\\d*|\\.\\d+))`, "i"));
+        if (match) {
+          const value = Number(match[1]);
+          if (Number.isFinite(value)) return value;
+        }
+      }
+      return NaN;
+    }
+
+    // '데이터 입력'의 추가 내용은 불량 문구를 우선 판정하고,
+    // 수치 기준이 정의된 항목만 라벨(인장강도·신장율·PH·전도도)을 우선 인식하고, 없으면 입력 순서대로 하한·상한을 비교한다.
+    function trPhysical1CustomBad(row, sampleRowId) {
+      if (!row || !sampleRowId) return false;
+      const result = trPhysical1Value(`${sampleRowId}:result`);
+      if (result !== "데이터 입력" && result !== "기타") return false;
+      const custom = String(trPhysical1Value(`${sampleRowId}:custom`) || "").trim();
+      if (!custom) return false;
+      if (/불\s*량/.test(custom)) return true;
+      if (!Array.isArray(row.customNumericRules) || !row.customNumericRules.length) return false;
+      const values = trPhysical1CustomNumbers(custom);
+      return row.customNumericRules.some((rule, index) => {
+        const labeledValue = trPhysical1LabeledCustomNumber(custom, rule);
+        const value = Number.isFinite(labeledValue) ? labeledValue : values[index];
+        if (!Number.isFinite(value)) return false;
+        return (Number.isFinite(rule.min) && value < rule.min)
+          || (Number.isFinite(rule.max) && value > rule.max);
+      });
+    }
+
     // 기준 벗어난 물리특성1 입력칸 빨간색 표시 (빈칸 제외)
-    // 박리력(range): 4~45N 벗어나면 / 유전정접(number): 0.5% 초과 / 드롭다운: 불량 선택 시
+    // 박리력(range): 4~45N 벗어나면 / 유전정접(number): 0.5% 초과 / 드롭다운: 불량 또는 추가 데이터 기준 이탈 시
     function recalcTRPhysical1Validation() {
       const container = el.trPhysical1Container;
       if (!container) return;
@@ -7101,7 +7144,9 @@
         if (!row) return;
         let bad = false;
         if (suffix === "result") {
-          bad = control.value === "불량";
+          bad = control.value === "불량" || trPhysical1CustomBad(row, sampleRowId);
+        } else if (suffix === "custom") {
+          bad = trPhysical1CustomBad(row, sampleRowId);
         } else if (row.type === "range" && (suffix === "min" || suffix === "max")) {
           const raw = String(control.value || "").trim();
           if (raw !== "") {
@@ -7118,7 +7163,7 @@
             }
           }
         } else {
-          return; // custom/dm/agency 등은 판정 제외
+          return; // dm/agency 등은 판정 제외
         }
         control.classList.toggle("tr-physical-bad", bad);
       });
@@ -7234,8 +7279,29 @@
       return avg * avg * 3.14 / 4 * neutralCount[0];
     }
 
+    function trStructureAverageMinimum(s, rowId) {
+      if (rowId !== "insulationThickness") return null;
+      return Number.isFinite(s?.insulationThicknessAverageMin) ? s.insulationThicknessAverageMin : null;
+    }
+
+    function trStructureAverageMinimumBad(s, rowId, sampleNo) {
+      const minimum = trStructureAverageMinimum(s, rowId);
+      if (minimum == null) return false;
+      const nums = trNumbers(rowId, sampleNo);
+      if (nums.length < 6) return false;
+      const average = nums.reduce((sum, value) => sum + value, 0) / nums.length;
+      return Number.isFinite(average) && average < minimum - 1e-9;
+    }
+
     function trResultValue(row, sampleNo) {
       const nums = trNumbers(row.id, sampleNo);
+      const averageMinimum = trStructureAverageMinimum(getTRStructureCriteria(), row.id);
+      if (averageMinimum != null) {
+        if (!nums.length) return "-";
+        const minimum = Math.min(...nums);
+        const average = nums.reduce((sum, value) => sum + value, 0) / nums.length;
+        return `최소 ${trFmt(minimum)} / 평균 ${trFmt(average)}`;
+      }
       if (row.result === "max") return nums.length ? trFmt(Math.max(...nums)) : "-";
       if (row.result === "min") return nums.length ? trFmt(Math.min(...nums)) : "-";
       if (row.result === "avg") return nums.length ? trFmt(nums.reduce((a, b) => a + b, 0) / nums.length) : "-";
@@ -7256,7 +7322,9 @@
           cell.textContent = trResultValue(row, sampleNo);
           const s = getTRStructureCriteria();
           const area = row.result === "neutralArea" ? trNeutralAreaValue(sampleNo) : NaN;
-          cell.classList.toggle("tr-structure-bad", !!s && Number.isFinite(area) && area < s.neutralAreaMin);
+          const areaBad = !!s && Number.isFinite(area) && area < s.neutralAreaMin;
+          const averageBad = !!s && trStructureAverageMinimumBad(s, row.id, sampleNo);
+          cell.classList.toggle("tr-structure-bad", areaBad || averageBad);
         }
       });
 
@@ -10319,7 +10387,11 @@
       });
       // 계약저항 입력칸: 비어 있으면 반짝임
       const contractInput = container.querySelector("[data-tr-elec-contract]");
-      if (contractInput) contractInput.classList.toggle("tr-elec-prompt", String(contractInput.value || "").trim() === "");
+      if (contractInput) {
+        const raw = String(contractInput.value || "").trim();
+        const value = Number(raw);
+        contractInput.classList.toggle("tr-elec-prompt", raw === "" || !Number.isFinite(value) || value <= 0);
+      }
       container.querySelectorAll("[data-tr-elec-voltage-custom], [data-tr-elec-impulse-custom]").forEach(input => {
         const required = !input.hidden && !input.disabled;
         input.classList.toggle("tr-need-input", required && String(input.value || "").trim() === "");
@@ -10635,6 +10707,13 @@
     }
     function trReportStructureResultValue(row, sampleNo) {
       const nums = trNumbers(row.id, sampleNo);
+      const averageMinimum = trStructureAverageMinimum(getTRStructureCriteria(), row.id);
+      if (averageMinimum != null) {
+        if (!nums.length) return "-";
+        const minimum = Math.min(...nums);
+        const average = nums.reduce((sum, value) => sum + value, 0) / nums.length;
+        return `최소 ${trReportStructureNumberString(minimum, row)} / 평균 ${trReportStructureNumberString(average, row)}`;
+      }
       if (row.result === "max") return nums.length ? trReportStructureNumberString(Math.max(...nums), row) : "-";
       if (row.result === "min") return nums.length ? trReportStructureNumberString(Math.min(...nums), row) : "-";
       if (row.result === "avg") {
@@ -10861,7 +10940,7 @@
         return false;
       }
       if (row.type === "autoDropdown" && calcTRPhysical2Evaluation(sampleNo).detailFail) return true;
-      return trPhysical1Value(`${base}:result`) === "불량";
+      return trPhysical1Value(`${base}:result`) === "불량" || trPhysical1CustomBad(row, base);
     }
     function trReportP1CombinedStatus(ids, fallback = "-") {
       const values = [];
@@ -10920,6 +10999,7 @@
             }
           }
         }
+        if (getTRStructureTableRows().some(row => trStructureAverageMinimumBad(s, row.id, sampleNo))) return true;
         const neutralArea = trNeutralAreaValue(sampleNo);
         if (Number.isFinite(neutralArea) && neutralArea < s.neutralAreaMin) return true;
 
@@ -10961,23 +11041,7 @@
         const info = trPhysical1RowSampleInfo(row, { askLowDrum: false });
         if (info.status !== "ok") continue;
         for (let s = 1; s <= info.count; s++) {
-          const sampleRowId = `${row.id}#${s}`;
-          if (TR_PHYSICAL1_AGENCY_NUMBER_ROW_IDS.has(row.id) && trPhysicalAgencyNumberMode(sampleRowId) !== "수치 입력") continue;
-          if (row.type === "range") {
-            const mn = Number(trPhysical1Value(`${row.id}#${s}:min`));
-            const mx = Number(trPhysical1Value(`${row.id}#${s}:max`));
-            if (Number.isFinite(mn) && mn < (row.validMin ?? -Infinity)) return true;
-            if (Number.isFinite(mx) && mx > (row.validMax ?? Infinity)) return true;
-          } else if (row.type === "number") {
-            const raw = trPhysical1Value(`${row.id}#${s}:value`);
-            const v = Number(raw);
-            if (String(raw).trim() !== "" && Number.isFinite(v)) {
-              if (row.failAtOrBelow != null && v <= row.failAtOrBelow) return true;
-              if (row.validMax != null && v > row.validMax) return true;
-            }
-          } else if (row.type !== "calc") {
-            if (trPhysical1Value(`${row.id}#${s}:result`) === "불량") return true;
-          }
+          if (trReportP1ResultBad(row, s)) return true;
         }
       }
       // 물리2 체적저항/한계
@@ -11325,7 +11389,10 @@
             : [0, 1, 2].map(i => valCell(trReportStructRaw(row.id, s)[i] ?? "", row.id)).join("")).join("");
           const rowBottom = slots.map(s => s == null ? "<td></td><td></td><td></td>"
             : [3, 4, 5].map(i => valCell(trReportStructRaw(row.id, s)[i] ?? "", row.id)).join("")).join("");
-          const rowResult = slots.map(s => `<td colspan="3">${s == null ? "" : trEsc(trReportStructureResultValue(row, s))}</td>`).join("");
+          const rowResult = slots.map(s => {
+            const averageBad = s != null && trStructureAverageMinimumBad(criteria, row.id, s);
+            return `<td colspan="3"${averageBad ? ' class="tr-rpt-bad"' : ""}>${s == null ? "" : trEsc(trReportStructureResultValue(row, s))}</td>`;
+          }).join("");
           rowsHtml += `<tr>
               <td rowspan="3" class="tr-struct-itemcell">${itemCellInner}</td>
               <td rowspan="2">측정치</td>${rowTop}
@@ -12113,6 +12180,12 @@
       if (getTRElectricalCriteria(spec)) {
         const drumCount = getTRElectricalDrumCount();
         const store = trElectricalValues[spec] || {};
+        if (trElectricalContractApplicable(spec)) {
+          const contractRaw = String(trElectricalContractValue(spec) || "").trim();
+          const contractValue = Number(contractRaw);
+          if (contractRaw === "") push("전기특성: 계약저항");
+          else if (!Number.isFinite(contractValue) || contractValue <= 0) push("전기특성: 계약저항은 0보다 큰 수치로 입력");
+        }
         const colTargetInfo = (col) => {
           const targets = trElectricalRandomTargetsForCol(col);
           const targetKeys = new Set(targets.map(trElectricalDmKey).filter(Boolean));
