@@ -1272,6 +1272,34 @@
       white-space: pre-line;
     }
 
+    .tr-physical-criteria-split {
+      margin: -6px;
+    }
+
+    .tr-physical-criteria-split>div {
+      display: grid;
+      grid-template-columns: 34% 66%;
+      align-items: stretch;
+      min-height: 34px;
+    }
+
+    .tr-physical-criteria-split>div+div {
+      border-top: 1px solid rgba(148, 163, 184, .35);
+    }
+
+    .tr-physical-criteria-split b,
+    .tr-physical-criteria-split span {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 5px;
+      line-height: 1.35;
+    }
+
+    .tr-physical-criteria-split span {
+      border-left: 1px solid rgba(148, 163, 184, .35);
+    }
+
     .tr-physical-result-cell {
       display: grid;
       gap: 4px;
@@ -3735,14 +3763,17 @@
     // ===== Materials (demo)
     const MATERIALS = [
       { name: "TR CNCE-W", cat: "전선", keywords: ["TR", "CNCE-W", "CNCE", "전선", "케이블"] },
+      { name: "FR CNCO-W", cat: "전선", keywords: ["FR", "CNCO-W", "CNCO", "전선", "케이블"] },
       { name: "TR CNCE-W/AL", cat: "전선", keywords: ["TR", "CNCE-W/AL", "CNCE", "AL", "알루미늄", "전선", "케이블"] },
       { name: "CV", cat: "전선", keywords: ["CV", "전선", "케이블"] },
     ];
     const TR_MATERIAL_CONFIG = {
       "TR CNCE-W": { specs: ["60mm2", "200mm2", "325mm2", "600mm2"], testBasis: "ES-6145-0025" },
+      "FR CNCO-W": { specs: ["60mm2", "200mm2", "325mm2", "600mm2"], testBasis: "ES-6145-0019" },
       "TR CNCE-W/AL": { specs: ["95mm2", "240mm2", "400mm2"], testBasis: "ES-6145-0026" },
     };
     let activeTRMaterial = "TR CNCE-W";
+    let trFRAcceptedSamplingState = null;
     const selectedMaterials = new Map();
 
     // ===== DOM
@@ -4387,6 +4418,7 @@
       updateTRAnnualStepVisibility();
       updateTRSummaryPanel();
       updateTRRequiredGlow();
+      captureFRSamplingState();
     }
 
     const TR_STRUCTURE_CRITERIA = {
@@ -4490,6 +4522,73 @@
       },
     };
 
+    // FR CNCO-W 전용 구조 기준 (ES-6145-0019 / 승인된 규격별 검토안).
+    // 기존 TR CNCE-W·TR CNCE-W/AL 기준과 구조 화면/입력/출력 로직은 변경하지 않는다.
+    const FR_CNCO_STRUCTURE_CRITERIA = {
+      "60mm2": {
+        cableOuterMax: 39, cableOuterStd: 36, cableOuterStdReference: false,
+        sheathStandard: 3.0, sheathMin: 2.7, sheathMax: null,
+        neutralDirection: "Z 또는 S-Z",
+        neutralCount: 18, neutralWireNominal: 1.20, neutralWireNominalDisplay: "1.2", neutralWireMin: 1.17, neutralWireMax: 1.23, neutralAreaMin: 19.60, neutralAreaMinDisplay: "19.60",
+        externalSemiOuterMin: null,
+        insulationOuterNominal: 24.5, insulationOuterTolerance: 1.0, insulationOuterMax: 25.5, insulationOuterMin: 23.5,
+        externalSemiThicknessStandard: 0.7, externalSemiThicknessMax: null, externalSemiThicknessMin: 0.5,
+        insulationThicknessAverageMin: 6.60, insulationThicknessAverageMinDisplay: "6.60", insulationThicknessMax: null, insulationThicknessMin: 5.94,
+        internalSemiThicknessStandard: 0.6, internalSemiThicknessMin: 0.5,
+        neutralPressedDepthMax: null,
+        conductorOuterNominal: 9.3, conductorOuterMin: 9.1, conductorOuterMax: 9.5,
+        conductorDirection: "최외층 S-꼬임",
+      },
+      "200mm2": {
+        cableOuterMax: 48, cableOuterStd: 45, cableOuterStdReference: false,
+        sheathStandard: 3.0, sheathMin: 2.7, sheathMax: null,
+        neutralDirection: "Z 또는 S-Z",
+        neutralCount: 21, neutralWireNominal: 2.00, neutralWireNominalDisplay: "2.0", neutralWireMin: 1.97, neutralWireMax: 2.03, neutralAreaMin: 64.68, neutralAreaMinDisplay: "64.68",
+        externalSemiOuterMin: null,
+        insulationOuterNominal: 32.1, insulationOuterTolerance: 1.0, insulationOuterMax: 33.1, insulationOuterMin: 31.1,
+        externalSemiThicknessStandard: 0.7, externalSemiThicknessMax: null, externalSemiThicknessMin: 0.5,
+        insulationThicknessAverageMin: 6.60, insulationThicknessAverageMinDisplay: "6.60", insulationThicknessMax: null, insulationThicknessMin: 5.94,
+        internalSemiThicknessStandard: 0.6, internalSemiThicknessMin: 0.5,
+        neutralPressedDepthMax: null,
+        conductorOuterNominal: 17.0, conductorOuterMin: 16.7, conductorOuterMax: 17.3,
+        conductorDirection: "최외층 S-꼬임",
+      },
+      "325mm2": {
+        cableOuterMax: 54, cableOuterStd: 51, cableOuterStdReference: false,
+        sheathStandard: 3.0, sheathMin: 2.7, sheathMax: null,
+        neutralDirection: "Z 또는 S-Z",
+        neutralCount: 26, neutralWireNominal: 2.30, neutralWireNominalDisplay: "2.3", neutralWireMin: 2.27, neutralWireMax: 2.33, neutralAreaMin: 105.84, neutralAreaMinDisplay: "105.84",
+        externalSemiOuterMin: null,
+        insulationOuterNominal: 36.8, insulationOuterTolerance: 1.0, insulationOuterMax: 37.8, insulationOuterMin: 35.8,
+        externalSemiThicknessStandard: 0.7, externalSemiThicknessMax: null, externalSemiThicknessMin: 0.5,
+        insulationThicknessAverageMin: 6.60, insulationThicknessAverageMinDisplay: "6.60", insulationThicknessMax: null, insulationThicknessMin: 5.94,
+        internalSemiThicknessStandard: 0.6, internalSemiThicknessMin: 0.5,
+        neutralPressedDepthMax: null,
+        conductorOuterNominal: 21.7, conductorOuterMin: 21.4, conductorOuterMax: 22.0,
+        conductorDirection: "최외층 S-꼬임",
+      },
+      "600mm2": {
+        cableOuterMax: 64, cableOuterStd: 61, cableOuterStdReference: false,
+        sheathStandard: 4.0, sheathMin: 3.6, sheathMax: null,
+        neutralDirection: "Z 또는 S-Z",
+        neutralCount: 38, neutralWireNominal: 2.60, neutralWireNominalDisplay: "2.6", neutralWireMin: 2.57, neutralWireMax: 2.63, neutralAreaMin: 196.98, neutralAreaMinDisplay: "196.98",
+        externalSemiOuterMin: null,
+        insulationOuterNominal: 44.6, insulationOuterTolerance: 1.0, insulationOuterMax: 45.6, insulationOuterMin: 43.6,
+        externalSemiThicknessStandard: 0.7, externalSemiThicknessMax: null, externalSemiThicknessMin: 0.5,
+        insulationThicknessAverageMin: 6.60, insulationThicknessAverageMinDisplay: "6.60", insulationThicknessMax: null, insulationThicknessMin: 5.94,
+        internalSemiThicknessStandard: 0.6, internalSemiThicknessMin: 0.5,
+        neutralPressedDepthMax: null,
+        conductorOuterNominal: 29.5, conductorOuterMin: 29.0, conductorOuterMax: 30.0,
+        conductorDirection: "최외층 S-꼬임",
+      },
+    };
+
+    function getTRStructureCriteria(spec = el.trItemDetail?.value || "", materialName = activeTRMaterial) {
+      return materialName === "FR CNCO-W"
+        ? FR_CNCO_STRUCTURE_CRITERIA[spec]
+        : TR_STRUCTURE_CRITERIA[spec];
+    }
+
     function trStructureCriterionDisplay(s, key) {
       return s[`${key}Display`] ?? s[key];
     }
@@ -4518,23 +4617,50 @@
     }
 
     const TR_STRUCTURE_TABLE_ROWS = [
-      { id: "cableOuter", title: "케이블 외경", mode: "six", inputLabel: "측정치", criteria: s => [`최대 ${s.cableOuterMax}mm ↓`, `표준 ${s.cableOuterStd}mm(참고)`], resultLabel: "최  대", result: "max", reportFixed2: true },
-      { id: "sheathThickness", title: "외피 두께", mode: "six", inputLabel: "측정치", criteria: s => [`최대 ${s.sheathMax}mm ↓`, `최소 ${s.sheathMin}mm ↑`], resultLabel: "결  과", result: "range", reportFixed2: true },
+      { id: "cableOuter", title: "케이블 외경", mode: "six", inputLabel: "측정치", criteria: s => [`최대 ${s.cableOuterMax}mm ↓`, `표준 ${s.cableOuterStd}mm${s.cableOuterStdReference === false ? "" : "(참고)"}`], resultLabel: "최  대", result: "max", reportFixed2: true },
+      { id: "sheathThickness", title: "외피 두께", mode: "six", inputLabel: "측정치", criteria: s => s.sheathStandard != null ? [`표준 ${s.sheathStandard.toFixed(1)}mm`, `최소 ${s.sheathMin.toFixed(1)}mm ↑`] : [`최대 ${s.sheathMax}mm ↓`, `최소 ${s.sheathMin}mm ↑`], resultLabel: "결  과", result: "range", reportFixed2: true },
       { id: "neutralDirection", title: "꼬임 방향(중성선)", mode: "singleText", inputLabel: "방  향", criteria: s => s.neutralDirection ? [s.neutralDirection] : [] },
       { id: "neutralCount", title: s => `중성선 수(${s.neutralCount}EA)`, mode: "single", inputLabel: "소선수", criteria: () => [] },
       { id: "neutralPitch", title: "피치(중성선)", mode: "pitch", inputLabel: "6~10배", criteria: () => [] },
-      { id: "neutralWireDiameter", title: "소선경(중성선)", mode: "six", inputLabel: "측정치", criteria: s => [`${s.neutralWireNominal.toFixed(2)}±0.03mm`, `(${s.neutralWireMin.toFixed(2)}~${s.neutralWireMax.toFixed(2)})`], resultLabel: "평  균", result: "avg", reportFixed2: true },
+      { id: "neutralWireDiameter", title: "소선경(중성선)", mode: "six", inputLabel: "측정치", criteria: s => [`${s.neutralWireNominalDisplay ?? s.neutralWireNominal.toFixed(2)}±0.03mm`, `(${s.neutralWireMin.toFixed(2)}~${s.neutralWireMax.toFixed(2)})`], resultLabel: "평  균", result: "avg", reportFixed2: true },
       { id: "neutralTotalArea", title: "중성선 총단면적", mode: "formula", inputLabel: "측정치", criteria: s => [`${trStructureCriterionDisplay(s, "neutralAreaMin")} ㎟↑`], result: "neutralArea", reportFixed2: true },
-      { id: "externalSemiOuter", title: "외부 반도전층\n외경", mode: "six", inputLabel: "측정치", criteria: s => [`최소 ${trStructureCriterionDisplay(s, "externalSemiOuterMin")}mm ↑`], resultLabel: "최  소", result: "min", reportFixed2: true },
-      { id: "insulationOuter", title: "절연층 외경", mode: "six", inputLabel: "측정치", criteria: s => [`최대 ${s.insulationOuterMax}mm ↓`, `최소 ${s.insulationOuterMin}mm ↑`], resultLabel: "결  과", result: "range", reportFixed2: true },
-      { id: "externalSemiThickness", title: "외부 반도전층 두께", mode: "six", inputLabel: "측정치", criteria: s => [`최대 ${s.externalSemiThicknessMax}mm ↓`, `최소 ${s.externalSemiThicknessMin}mm ↑`], resultLabel: "결  과", result: "range", reportFixed2: true },
-      { id: "insulationThickness", title: "절연층 두께", mode: "six", inputLabel: "측정치", criteria: s => [`최대 ${s.insulationThicknessMax}mm ↓`, `최소 ${s.insulationThicknessMin}mm ↑`], resultLabel: "결  과", result: "range", reportFixed2: true },
-      { id: "internalSemiThickness", title: "내부 반도전층 두께", mode: "six", inputLabel: "측정치", criteria: s => [`최소 ${trStructureCriterionDisplay(s, "internalSemiThicknessMin")}mm ↑`], resultLabel: "최  소", result: "min", reportFixed2: true },
-      { id: "neutralPressedDepth", title: "외부 반도전층\n중성선 눌린 깊이", mode: "six", inputLabel: "측정치", criteria: s => [`${s.neutralPressedDepthMax}mm 이내`], resultLabel: "최  대", result: "max", reportFixed2: true },
+      { id: "externalSemiOuter", title: "외부 반도전층\n외경", mode: "six", inputLabel: "측정치", criteria: s => s.externalSemiOuterMin == null ? [] : [`최소 ${trStructureCriterionDisplay(s, "externalSemiOuterMin")}mm ↑`], resultLabel: "최  소", result: "min", reportFixed2: true },
+      { id: "insulationOuter", title: "절연층 외경", mode: "six", inputLabel: "측정치", criteria: s => s.insulationOuterNominal != null ? [`${s.insulationOuterNominal.toFixed(1)}±${s.insulationOuterTolerance.toFixed(1)}mm`, `(${s.insulationOuterMin.toFixed(1)}~${s.insulationOuterMax.toFixed(1)})`] : [`최대 ${s.insulationOuterMax}mm ↓`, `최소 ${s.insulationOuterMin}mm ↑`], resultLabel: "결  과", result: "range", reportFixed2: true },
+      { id: "externalSemiThickness", title: "외부 반도전층 두께", mode: "six", inputLabel: "측정치", criteria: s => s.externalSemiThicknessStandard != null ? [`표준 ${s.externalSemiThicknessStandard.toFixed(1)}mm`, `최소 ${s.externalSemiThicknessMin.toFixed(1)}mm ↑`] : [`최대 ${s.externalSemiThicknessMax}mm ↓`, `최소 ${s.externalSemiThicknessMin}mm ↑`], resultLabel: "결  과", result: "range", reportFixed2: true },
+      { id: "insulationThickness", title: "절연층 두께", mode: "six", inputLabel: "측정치", criteria: s => s.insulationThicknessAverageMin != null ? [`평균 ${trStructureCriterionDisplay(s, "insulationThicknessAverageMin")}mm ↑`, `최소 ${s.insulationThicknessMin.toFixed(2)}mm ↑`] : [`최대 ${s.insulationThicknessMax}mm ↓`, `최소 ${s.insulationThicknessMin}mm ↑`], resultLabel: "결  과", result: "range", reportFixed2: true },
+      { id: "internalSemiThickness", title: "내부 반도전층 두께", mode: "six", inputLabel: "측정치", criteria: s => s.internalSemiThicknessStandard != null ? [`표준 ${s.internalSemiThicknessStandard.toFixed(1)}mm`, `최소 ${s.internalSemiThicknessMin.toFixed(1)}mm ↑`] : [`최소 ${trStructureCriterionDisplay(s, "internalSemiThicknessMin")}mm ↑`], resultLabel: "최  소", result: "min", reportFixed2: true },
+      { id: "neutralPressedDepth", title: "외부 반도전층\n중성선 눌린 깊이", mode: "six", inputLabel: "측정치", criteria: s => s.neutralPressedDepthMax == null ? [] : [`${s.neutralPressedDepthMax}mm 이내`], resultLabel: "최  대", result: "max", reportFixed2: true },
       { id: "conductorOuter", title: "도체 외경", mode: "six", inputLabel: "측정치", criteria: s => [`${s.conductorOuterNominal.toFixed(1)}±${s.conductorOuterNominal >= 29 ? "0.5" : s.conductorOuterNominal >= 17 ? "0.3" : "0.2"}mm`, `(${s.conductorOuterMin.toFixed(1)}~${s.conductorOuterMax.toFixed(1)})`], resultLabel: "평  균", result: "avg", reportFixed2: true },
       { id: "conductorDirection", title: "꼬임 방향(도체)", mode: "singleText", inputLabel: "방  향", criteria: s => s.conductorDirection ? [s.conductorDirection] : [] },
       { id: "conductorPitch", title: "피치(도체)", mode: "pitch", inputLabel: "20배↓", criteria: () => [] },
     ];
+
+    const FR_CNCO_STRUCTURE_EXCLUDED_ROW_IDS = new Set(["externalSemiOuter", "neutralPressedDepth"]);
+    function getTRStructureTableRows(materialName = activeTRMaterial) {
+      return materialName === "FR CNCO-W"
+        ? TR_STRUCTURE_TABLE_ROWS.filter(row => !FR_CNCO_STRUCTURE_EXCLUDED_ROW_IDS.has(row.id))
+        : TR_STRUCTURE_TABLE_ROWS;
+    }
+    function trStructureValueRowId(key) {
+      const parts = String(key || "").split("#");
+      return parts[0] === "bae" ? parts[1] : parts[0];
+    }
+    function trRemoveFRExcludedStructureValues(materialName = activeTRMaterial) {
+      if (materialName !== "FR CNCO-W") return;
+      Object.keys(trStructureValues).forEach(key => {
+        if (FR_CNCO_STRUCTURE_EXCLUDED_ROW_IDS.has(trStructureValueRowId(key))) delete trStructureValues[key];
+      });
+    }
+    function trStructureValuesForSave(materialName = activeTRMaterial) {
+      saveTRStructureState();
+      const values = { ...trStructureValues };
+      if (materialName === "FR CNCO-W") {
+        Object.keys(values).forEach(key => {
+          if (FR_CNCO_STRUCTURE_EXCLUDED_ROW_IDS.has(trStructureValueRowId(key))) delete values[key];
+        });
+      }
+      return values;
+    }
 
     let trStructureWireMark = "";
     let trStructureAppearance = "";
@@ -4585,7 +4711,7 @@
 
     function trStructureInputState(sampleCount = null) {
       saveTRStructureState();
-      const criteria = TR_STRUCTURE_CRITERIA[el.trItemDetail?.value || ""];
+      const criteria = getTRStructureCriteria();
       if (!criteria) return { status: "none", filled: 0, total: 0 };
       const resolvedCount = sampleCount == null
         ? Math.max(0, Number(getTRStructureSampleInfo()?.value) || 0)
@@ -4612,7 +4738,7 @@
       countText(trStructureWireMark);
       countText(trStructureAppearance);
       for (let sample = 1; sample <= resolvedCount; sample += 1) {
-        TR_STRUCTURE_TABLE_ROWS.forEach(row => {
+        getTRStructureTableRows().forEach(row => {
           if (row.mode === "formula") return;
           if (row.mode === "six") {
             total += 6;
@@ -4683,8 +4809,17 @@
       delete el.trDrumQty.dataset.lowDrumNotice;
     }
 
+    function isFRCNCOMaterial(materialName = activeTRMaterial) {
+      return materialName === "FR CNCO-W";
+    }
+
     function getTRLowDrumOmitChoice({ ask = false } = {}) {
       if (!el.trDrumQty) return false;
+      // FR CNCO-W는 3드럼 이하에서도 생략 항목이 없다.
+      if (isFRCNCOMaterial()) {
+        resetTRLowDrumOmitChoice();
+        return false;
+      }
       const drumQty = Number(el.trDrumQty.value);
       if (!Number.isFinite(drumQty) || drumQty <= 0 || drumQty > 3) {
         resetTRLowDrumOmitChoice();
@@ -4694,7 +4829,8 @@
       const choiceKey = String(Math.ceil(drumQty));
       const hasChoice = el.trDrumQty.dataset.lowDrumChoiceKey === choiceKey && el.trDrumQty.dataset.lowDrumOmit != null;
       if (!hasChoice) {
-        if (!ask) return true;
+        // 사용자가 선택하기 전에는 임의로 생략하지 않는다.
+        if (!ask) return false;
         const omit = confirm("드럼수량이 3D/M 이하입니다.\n기준상 생략 가능한 시험항목을 생략하시겠습니까?\n\n확인: 생략\n취소: 생략하지 않고 1개 시료 기준으로 진행");
         el.trDrumQty.dataset.lowDrumChoiceKey = choiceKey;
         el.trDrumQty.dataset.lowDrumOmit = omit ? "1" : "0";
@@ -4830,7 +4966,7 @@
         else if (isBCD && (type === "일반" || type === "분기" || type === "반기" || type === "연1회")) base = 1;
       }
       if (base <= 0) return { status: "na", count: 0 };
-      if (pattern === "C" && drum <= 3 && getTRLowDrumOmitChoice({ ask: askLowDrum })) return { status: "omit", count: 0 };
+      if (!isFRCNCOMaterial() && pattern === "C" && drum <= 3 && getTRLowDrumOmitChoice({ ask: askLowDrum })) return { status: "omit", count: 0 };
       return { status: "ok", count: applyTRRetestCount(base) };
     }
 
@@ -4841,7 +4977,7 @@
       if (!Number.isFinite(drumQty) || drumQty <= 0) return { label: "-", value: null };
       if (!grade) return { label: "품질등급 선택 필요", value: null };
       if (isTRSamplingSkippedByType(grade, inspectionType)) return { label: "해당 없음", value: null };
-      if (lowDrumOmit && drumQty <= 3 && getTRLowDrumOmitChoice({ ask: true })) return { label: "생략", value: 0 };
+      if (!isFRCNCOMaterial() && lowDrumOmit && drumQty <= 3 && getTRLowDrumOmitChoice({ ask: true })) return { label: "생략", value: 0 };
 
       const divisor = (grade === "S" || grade === "A") ? 30 : 15;
       const value = applyTRRetestCount(Math.max(1, Math.ceil(drumQty / divisor)));
@@ -4857,13 +4993,13 @@
       if (isTRSamplingSkippedByType(grade, inspectionType)) return { label: "해당 없음", value: null };
 
       if ((grade === "S" || grade === "A") && (inspectionType === "반기" || inspectionType === "연1회")) {
-        if (drumQty <= 3 && getTRLowDrumOmitChoice({ ask: true })) return { label: "생략", value: 0 };
+        if (!isFRCNCOMaterial() && drumQty <= 3 && getTRLowDrumOmitChoice({ ask: true })) return { label: "생략", value: 0 };
         const value = applyTRRetestCount(1);
         return { label: `${value}개`, value };
       }
       if ((grade === "B" || grade === "C" || grade === "D")
         && (inspectionType === "일반" || inspectionType === "분기" || inspectionType === "반기" || inspectionType === "연1회")) {
-        if (drumQty <= 3 && getTRLowDrumOmitChoice({ ask: true })) return { label: "생략", value: 0 };
+        if (!isFRCNCOMaterial() && drumQty <= 3 && getTRLowDrumOmitChoice({ ask: true })) return { label: "생략", value: 0 };
         const value = applyTRRetestCount(1);
         return { label: `${value}개`, value };
       }
@@ -4875,6 +5011,10 @@
     }
 
     function notifyTRLowDrumQty() {
+      if (isFRCNCOMaterial()) {
+        resetTRLowDrumOmitChoice();
+        return;
+      }
       getTRLowDrumOmitChoice({ ask: true });
     }
 
@@ -4916,6 +5056,31 @@
       },
     };
 
+    // FR CNCO-W 전용 전기특성 기준 (ES-6145-0019 표 6).
+    // 다른 전선 품목은 기존 TR_ELECTRICAL_CRITERIA를 그대로 사용한다.
+    const FR_CNCO_ELECTRICAL_CRITERIA = {
+      "60mm2": {
+        insulation: "절연저항\n(3,000㏁.km 이상)",
+        conductor: "도체저항\n(0.305Ω/km 이하)",
+        capacitance: "정전용량\n(0.21\n㎌/㎞ 이하)",
+      },
+      "200mm2": {
+        insulation: "절연저항\n(2,000㏁.km 이상)",
+        conductor: "도체저항\n(0.0915Ω/km 이하)",
+        capacitance: "정전용량\n(0.32\n㎌/㎞ 이하)",
+      },
+      "325mm2": {
+        insulation: "절연저항\n(2,000㏁.km 이상)",
+        conductor: "도체저항\n(0.0568Ω/km 이하)",
+        capacitance: "정전용량\n(0.36\n㎌/㎞ 이하)",
+      },
+      "600mm2": {
+        insulation: "절연저항\n(1,500㏁.km 이상)",
+        conductor: "도체저항\n(0.0308Ω/km 이하)",
+        capacitance: "정전용량\n(0.47\n㎌/㎞ 이하)",
+      },
+    };
+
     const trElectricalValues = {};
     const trElectricalContractValues = {};
 
@@ -4931,6 +5096,45 @@
       "240mm2": { insulationMin: 2000, capacitanceMax: 0.32 },
       "400mm2": { insulationMin: 2000, capacitanceMax: 0.36 },
     };
+    const FR_CNCO_ELECTRICAL_LIMITS = {
+      "60mm2": { insulationMin: 3000, conductorMax: 0.305, capacitanceMax: 0.21 },
+      "200mm2": { insulationMin: 2000, conductorMax: 0.0915, capacitanceMax: 0.32 },
+      "325mm2": { insulationMin: 2000, conductorMax: 0.0568, capacitanceMax: 0.36 },
+      "600mm2": { insulationMin: 1500, conductorMax: 0.0308, capacitanceMax: 0.47 },
+    };
+
+    function getTRElectricalCriteria(spec = el.trItemDetail?.value || "", materialName = activeTRMaterial) {
+      return materialName === "FR CNCO-W"
+        ? FR_CNCO_ELECTRICAL_CRITERIA[spec]
+        : TR_ELECTRICAL_CRITERIA[spec];
+    }
+
+    function getTRElectricalLimits(spec = el.trItemDetail?.value || "", materialName = activeTRMaterial) {
+      return materialName === "FR CNCO-W"
+        ? FR_CNCO_ELECTRICAL_LIMITS[spec]
+        : TR_ELECTRICAL_LIMITS[spec];
+    }
+
+    // FR CNCO-W는 325mm²에서만 계약저항을 사용한다. 다른 품목은 기존 동작 유지.
+    function trElectricalContractApplicable(spec = el.trItemDetail?.value || "", materialName = activeTRMaterial) {
+      return materialName !== "FR CNCO-W" || spec === "325mm2";
+    }
+
+    function trElectricalContractValue(spec, materialName = activeTRMaterial) {
+      return trElectricalContractApplicable(spec, materialName)
+        ? (trElectricalContractValues[spec] || "")
+        : "";
+    }
+
+    function trElectricalConductorLimit(spec, materialName = activeTRMaterial, contractValue = trElectricalContractValue(spec, materialName)) {
+      if (trElectricalContractApplicable(spec, materialName)) {
+        const raw = String(contractValue ?? "").trim();
+        const contract = Number(raw);
+        return raw !== "" && Number.isFinite(contract) ? contract : null;
+      }
+      const limit = getTRElectricalLimits(spec, materialName)?.conductorMax;
+      return Number.isFinite(limit) ? limit : null;
+    }
     const TR_ELECTRICAL_PARTIAL_DISCHARGE_MAX = 10;
     const TR_ELECTRICAL_DIELECTRIC_MAX = 0.4;
 
@@ -4959,7 +5163,7 @@
         }
       });
 
-      ["F", "H", "I", "J", "K"].forEach(col => {
+      ["F", "H", "I", "J", "K", "L"].forEach(col => {
         const info = trElectricalInfoForCol(col, sampleInfoMap);
         const allowed = Number(info?.value);
         const keys = Object.keys(store)
@@ -4974,6 +5178,10 @@
           if (kept < allowed) kept += 1;
           else delete store[key];
         });
+      });
+      Object.keys(store).filter(key => key.endsWith(":L_text")).forEach(key => {
+        const rowNo = key.split(":")[0];
+        if (store[`${rowNo}:L`] !== "기타") delete store[key];
       });
     }
 
@@ -5016,13 +5224,15 @@
       const proportional = getTRProportionalSampleInfo({ lowDrumOmit: true });
       const conductor = getTRProportionalSampleInfo({ lowDrumOmit: false });
       const single = getTRSingleElectricalSampleInfo();
-      return {
+      const infoMap = {
         F: { ...single, name: "절연저항" },
         H: { ...conductor, name: "도체저항" },
         I: { ...single, name: "정전용량" },
         J: { ...proportional, name: "부분방전" },
         K: { ...single, name: "유전정접" },
       };
+      if (isFRCNCOMaterial()) infoMap.L = { ...single, name: "충격내전압" };
+      return infoMap;
     }
 
     function trElectricalLimitPlaceholder(info) {
@@ -5089,9 +5299,34 @@
       `;
     }
 
+    function trElectricalImpulseInput(spec, rowNo, sampleInfo) {
+      if (!trElectricalInputAllowed(sampleInfo)) {
+        const label = trElectricalLimitPlaceholder(sampleInfo);
+        return `<input class="tr-electric-limited-input" type="text" disabled value="" aria-label="충격내전압 ${trAttr(label)}" />`;
+      }
+      const savedValue = trElectricalValue(spec, rowNo, "L");
+      const savedText = trElectricalValue(spec, rowNo, "L_text");
+      const options = ["양호", "불량", "기타"];
+      const selectedValue = options.includes(savedValue) || savedValue === "" ? savedValue : "기타";
+      const customValue = savedText || (!options.includes(savedValue) && savedValue ? savedValue : "");
+      const optionHtml = [`<option value="">선택</option>`]
+        .concat(options.map(option => `<option value="${option}"${selectedValue === option ? " selected" : ""}>${option}</option>`))
+        .join("");
+      const limitedAttrs = ` data-tr-elec-sample-limited="1" data-tr-elec-limit-name="충격내전압" data-tr-elec-limit-label="${trAttr(sampleInfo.label)}" data-tr-elec-limit-allowed="${Number.isFinite(sampleInfo.value) ? sampleInfo.value : ""}"`;
+      return `
+        <div class="tr-electric-voltage-cell">
+          <select data-tr-elec-input="${rowNo}:L" data-tr-elec-row="${rowNo}" data-tr-elec-col="L" data-tr-elec-impulse-select${limitedAttrs}>
+            ${optionHtml}
+          </select>
+          <input class="tr-electric-voltage-custom" data-tr-elec-input="${rowNo}:L_text" data-tr-elec-row="${rowNo}" data-tr-elec-col="L_text" data-tr-elec-impulse-custom type="text" placeholder="기타 입력" value="${trAttr(customValue)}"${selectedValue === "기타" ? "" : " hidden disabled"} />
+        </div>
+      `;
+    }
+
     function renderTRElectricalRows(spec, count, sampleInfoMap) {
+      const showImpulse = isFRCNCOMaterial();
       if (!count) {
-        return `<tr><td class="tr-electric-empty-row" colspan="10">Step1에서 드럼수량(D/M)을 입력하면 데이터 입력 행이 생성됩니다.</td></tr>`;
+        return `<tr><td class="tr-electric-empty-row" colspan="${showImpulse ? 11 : 10}">Step1에서 드럼수량(D/M)을 입력하면 데이터 입력 행이 생성됩니다.</td></tr>`;
       }
 
       return Array.from({ length: count }, (_, index) => {
@@ -5102,6 +5337,7 @@
             <td>${trElectricalInput(spec, rowNo, "B")}</td>
             <td>${trElectricalInput(spec, rowNo, "C")}</td>
             <td>${trElectricalVoltageInput(spec, rowNo)}</td>
+            ${showImpulse ? `<td>${trElectricalImpulseInput(spec, rowNo, sampleInfoMap.L)}</td>` : ""}
             <td>${trElectricalInput(spec, rowNo, "F", "number", "0.01", sampleInfoMap.F)}</td>
             <td>${trElectricalResultOutput(rowNo, sampleInfoMap.F)}</td>
             <td>${trElectricalInput(spec, rowNo, "H", "number", "0.01", sampleInfoMap.H)}</td>
@@ -5802,7 +6038,7 @@
     }
 
     function toggleTRElectricalVoltageCustom(select) {
-      const custom = select.closest(".tr-electric-voltage-cell")?.querySelector("[data-tr-elec-voltage-custom]");
+      const custom = select.closest(".tr-electric-voltage-cell")?.querySelector("[data-tr-elec-voltage-custom], [data-tr-elec-impulse-custom]");
       if (!custom) return;
       const isCustom = select.value === "기타";
       custom.hidden = !isCustom;
@@ -5856,15 +6092,16 @@
       const container = el.trElectricalContainer;
       if (!container) return;
       const spec = container.dataset.spec || "";
-      const limits = TR_ELECTRICAL_LIMITS[spec];
-      const contractRaw = String(container.querySelector("[data-tr-elec-contract]")?.value || "").trim();
-      const contract = Number(contractRaw);
-      const hasContract = contractRaw !== "" && Number.isFinite(contract);
+      const limits = getTRElectricalLimits(spec);
+      const contractRaw = trElectricalContractApplicable(spec)
+        ? String(container.querySelector("[data-tr-elec-contract]")?.value || "").trim()
+        : "";
+      const conductorLimit = trElectricalConductorLimit(spec, activeTRMaterial, contractRaw);
 
       container.querySelectorAll("[data-tr-elec-row]").forEach(input => {
         const col = input.dataset.trElecCol;
         let bad = false;
-        if (col === "E") {
+        if (col === "E" || col === "L") {
           // 내전압 드롭다운: 불량 선택 시 빨강
           bad = input.value === "불량";
         } else {
@@ -5872,7 +6109,7 @@
           if (raw !== "") {
             const v = Number(raw);
             if (Number.isFinite(v)) {
-              if (col === "H") bad = hasContract && v > contract;            // 도체저항 ≤ 계약저항
+              if (col === "H") bad = conductorLimit != null && v > conductorLimit; // 도체저항
               else if (col === "I") bad = !!limits && v > limits.capacitanceMax; // 정전용량
               else if (col === "J") bad = v > TR_ELECTRICAL_PARTIAL_DISCHARGE_MAX; // 부분방전
               else if (col === "K") bad = v > TR_ELECTRICAL_DIELECTRIC_MAX;   // 유전정접
@@ -5900,14 +6137,15 @@
         .filter(input => !input.disabled && !input.readOnly && !input.hidden);
       const rowNumber = input => Number(input.dataset.trElecRow) || 0;
       const byRow = list => list.sort((a, b) => rowNumber(a) - rowNumber(b));
-      return ["A", "B", "C", "E", "F", "H", "I", "J", "K"].flatMap(col => {
-        if (col !== "E") {
+      const cols = isFRCNCOMaterial() ? ["A", "B", "C", "E", "L", "F", "H", "I", "J", "K"] : ["A", "B", "C", "E", "F", "H", "I", "J", "K"];
+      return cols.flatMap(col => {
+        if (col !== "E" && col !== "L") {
           return byRow(inputs.filter(input => input.dataset.trElecCol === col));
         }
-        return byRow(inputs.filter(input => input.dataset.trElecCol === "E")).flatMap(select => {
+        return byRow(inputs.filter(input => input.dataset.trElecCol === col)).flatMap(select => {
           const row = select.dataset.trElecRow;
           const custom = inputs.find(input =>
-            input.dataset.trElecCol === "E_text" && input.dataset.trElecRow === row
+            input.dataset.trElecCol === `${col}_text` && input.dataset.trElecRow === row
           );
           return custom ? [select, custom] : [select];
         });
@@ -6002,7 +6240,7 @@
         input.addEventListener("input", checkSampleLimit);
         input.addEventListener("change", checkSampleLimit);
       });
-      container.querySelectorAll("[data-tr-elec-voltage-select]").forEach(select => {
+      container.querySelectorAll("[data-tr-elec-voltage-select], [data-tr-elec-impulse-select]").forEach(select => {
         toggleTRElectricalVoltageCustom(select);
         select.addEventListener("change", () => {
           toggleTRElectricalVoltageCustom(select);
@@ -6018,7 +6256,8 @@
       if (!el.trElectricalContainer) return;
 
       const spec = el.trItemDetail?.value || "";
-      const criteria = TR_ELECTRICAL_CRITERIA[spec];
+      const criteria = getTRElectricalCriteria(spec);
+      const showContract = trElectricalContractApplicable(spec);
       if (el.trElectricalSpecPill) el.trElectricalSpecPill.textContent = spec ? `규격: ${spec}` : "규격: -";
 
       if (!criteria) {
@@ -6030,6 +6269,7 @@
 
       const drumCount = getTRElectricalDrumCount();
       const sampleInfoMap = getTRElectricalSampleInfoMap();
+      const showImpulse = isFRCNCOMaterial();
       trPruneTRElectricalState(spec, sampleInfoMap);
       if (el.trElectricalSpecNote) {
         const sampleSummary = [
@@ -6038,6 +6278,7 @@
           `정전용량 ${sampleInfoMap.I.label}`,
           `부분방전 ${sampleInfoMap.J.label}`,
           `유전정접 ${sampleInfoMap.K.label}`,
+          ...(showImpulse ? [`충격내전압 ${sampleInfoMap.L.label}`] : []),
         ].join(" · ");
         el.trElectricalSpecNote.textContent = `드럼수량 기준 ${drumCount || 0}개 입력 행이 표시됩니다. 항목별 시료 수량: ${sampleSummary}`;
       }
@@ -6050,6 +6291,7 @@
               <col style="width:9%;">
               <col style="width:9%;">
               <col style="width:10%;">
+              ${showImpulse ? '<col style="width:10%;">' : ""}
               <col style="width:10%;">
               <col style="width:10%;">
               <col style="width:17%;">
@@ -6084,21 +6326,23 @@
                     </button>
                   </div>
                 </th>
+                ${showImpulse ? '<th rowspan="3">충격내전압<br>(절연체)</th>' : ""}
                 <th colspan="2">${criteria.insulation}</th>
-                <th>${criteria.conductor}</th>
+                <th${showContract ? "" : ' rowspan="3"'}>${criteria.conductor}</th>
                 <th rowspan="3">${criteria.capacitance}</th>
                 <th rowspan="3">부분방전<br>(10pC 이하)</th>
-                <th rowspan="3">유전정접<br>(0.4% 이하)</th>
+                <th rowspan="3">유전정접<br>${showImpulse ? "(13.2kV / 0.4% 이하)" : "(0.4% 이하)"}</th>
               </tr>
               <tr>
                 <th rowspan="2">측정치</th>
                 <th rowspan="2">환산치</th>
-                <th>계약저항</th>
+                ${showContract ? "<th>계약저항</th>" : ""}
               </tr>
               <tr>
+                ${showContract ? `
                 <th>
-                  <span class="tr-electric-contract">(<input data-tr-elec-contract type="number" step="0.0001" inputmode="decimal" placeholder="계약저항 입력" value="${trAttr(trElectricalContractValues[spec] || "")}" />Ω/km 이하)</span>
-                </th>
+                  <span class="tr-electric-contract">(<input data-tr-elec-contract type="number" step="0.0001" inputmode="decimal" placeholder="계약저항 입력" value="${trAttr(trElectricalContractValue(spec))}" />Ω/km 이하)</span>
+                </th>` : ""}
               </tr>
             </thead>
             <tbody>
@@ -6114,14 +6358,14 @@
     const TR_PHYSICAL1_DROPDOWN_OPTIONS = [
       "양호",
       "불량",
-      "기타",
+      "데이터 입력",
       "해당사항 없음",
       "전력기자재센터 시험의뢰",
       "공인기관 시험의뢰",
     ];
 
     const TR_PUBLIC_INSTITUTE_OPTIONS = ["KERI", "KTR", "KTC", "KTL", "전선조합", "기타"];
-    const TR_PHYSICAL1_AGENCY_NUMBER_ROW_IDS = new Set(["dielectric90", "dielectric130", "dielectricRoom", "acBreakdown"]);
+    const TR_PHYSICAL1_AGENCY_NUMBER_ROW_IDS = new Set(["dielectric90", "dielectric130", "dielectric60", "dielectricRoom", "acBreakdown"]);
 
     const TR_PHYSICAL1_ROWS = [
       { id: "insulationSemiInspection", item: "절연층 및 반도전층 검사", sub: "", criteria: "물리적특성2 참조", type: "autoDropdown", pattern: "A" },
@@ -6134,30 +6378,106 @@
       { id: "acBreakdown", item: "절연압출공정\n적합성 시험", sub: "교류\n파괴", criteria: "123kV 이하에서\n절연 파괴 없어야 함", type: "number", pattern: "A", failAtOrBelow: 123 },
       { id: "neutralWater", item: "중성선 수밀", sub: "", criteria: "케이블 양단에 누수 없을 것", type: "dropdown", pattern: "A" },
       { id: "conductorWater", item: "도체 수밀", sub: "", criteria: "타 단에 누수 없을 것", type: "dropdown", pattern: "A" },
-      { id: "compoundDrop", item: "컴파운드 적하 시험", sub: "", criteria: "적하가 없을 것", type: "dropdown", pattern: "A" },
       { id: "tensileElongation", item: "인장강도 및 신율,\n신축변형", sub: "", criteria: "구매규격서 참조", type: "dropdown", pattern: "C" },
       { id: "ionicImpurity", item: "반도전층 이온성\n불순물", sub: "", criteria: "구매규격서 참조", type: "dropdown", pattern: "A" },
       { id: "sheathProperty", item: "외피특성", sub: "", criteria: "구매규격서 참조", type: "dropdown", pattern: "A" },
     ];
 
+    // FR CNCO-W 전용 물리적특성1 시험항목 (ES-6145-0019 및 사용자 검토안).
+    // 다른 전선 품목은 기존 TR_PHYSICAL1_ROWS를 그대로 사용한다.
+    const FR_CNCO_PHYSICAL1_ROWS = [
+      { id: "insulationSemiInspection", item: "절연층 및 반도전층 검사", sub: "", criteria: "물리적특성2 참조", type: "autoDropdown", pattern: "C" },
+      { id: "semiVolumeInner", item: "반도전층\n체적저항", sub: "내도", criteria: "1,000Ω·m ↓", type: "calc", calc: "innerVolume", pattern: "B" },
+      { id: "semiVolumeOuter", item: "반도전층\n체적저항", sub: "외도", criteria: "500Ω·m ↓", type: "calc", calc: "outerVolume", pattern: "B" },
+      { id: "outerSemiPeel", item: "외부반도전층\n박리력 시험", sub: "", criteria: "4 ~ 45N", type: "range", pattern: "C", validMin: 4, validMax: 45 },
+      { id: "dielectricRoom", item: "유전정접\n온도특성", sub: "유전정접\n상온", criteria: "0.4% 이하", type: "number", pattern: "C", validMax: 0.4 },
+      { id: "dielectric60", item: "유전정접\n온도특성", sub: "유전정접\n60℃", criteria: "0.4% 이하", type: "number", pattern: "C", validMax: 0.4 },
+      { id: "dielectric90", item: "유전정접\n온도특성", sub: "유전정접\n90℃", criteria: "0.4% 이하", type: "number", pattern: "C", validMax: 0.4 },
+      { id: "neutralWater", item: "중성선 수밀", sub: "", criteria: "케이블 양단에 누수 없을 것", type: "dropdown", pattern: "A" },
+      { id: "conductorWater", item: "도체 수밀", sub: "", criteria: "타 단에 누수 없을 것", type: "dropdown", pattern: "A" },
+      { id: "tensileElongation", item: "인장강도 및 신율,\n신축변형", sub: "", criteria: "구매규격서 참조", type: "dropdown", pattern: "C" },
+      { id: "ionicImpurity", item: "반도전층 이온성\n불순물", sub: "", criteria: "구매규격서 참조", type: "dropdown", pattern: "A" },
+      { id: "crosslinkInner", item: "가교도 시험", sub: "내도부위", criteria: "70% 이상", type: "dropdown", pattern: "C" },
+      { id: "crosslinkFiller", item: "가교도 시험", sub: "절연체 중간부위", criteria: "80% 이상", type: "dropdown", pattern: "C" },
+      { id: "crosslinkOuter", item: "가교도 시험", sub: "외도부위", criteria: "70% 이상", type: "dropdown", pattern: "C" },
+      { id: "environmentCold", item: "내 환경성 시험", sub: "내한성(시스)", criteria: "시험편이 파괴되지 않을 것", type: "dropdown", pattern: "C" },
+      {
+        id: "environmentOil", item: "내 환경성 시험", sub: "내유성(시스)",
+        criteria: "인장강도: 침유전의 값의 80% 이상\n신장율: 침유전의 값의 60% 이상",
+        criteriaParts: [
+          { label: "인장강도", value: "침유전의 값의 80% 이상" },
+          { label: "신장율", value: "침유전의 값의 60% 이상" },
+        ],
+        type: "dropdown", pattern: "C",
+      },
+      { id: "environmentFlameSheath", item: "내 환경성 시험", sub: "난연성 (시스)", criteria: "불꽃이 상부 케이블의 Tray 전체 높이까지\n연소하지 않을 것", type: "dropdown", pattern: "A" },
+      { id: "environmentOxygenIndex", item: "내 환경성 시험", sub: "산소지수 (시스)", criteria: "30 이상", type: "dropdown", pattern: "A" },
+      { id: "environmentCorrosivity", item: "내 환경성 시험", sub: "연소가스부식성 (시스)", criteria: "PH 4.3 이상\n전도도 10μs/mm 이하", type: "dropdown", pattern: "A" },
+      { id: "environmentToxicity", item: "내 환경성 시험", sub: "무독성 (시스)", criteria: "HCl 함량 0.5% 이하", type: "dropdown", pattern: "A" },
+      { id: "environmentSmokeDensity", item: "내 환경성 시험", sub: "연기밀도(시스)", criteria: "빛투과율 60% 이상", type: "dropdown", pattern: "A" },
+    ];
+
+    function getTRPhysical1Rows(materialName = activeTRMaterial) {
+      return materialName === "FR CNCO-W" ? FR_CNCO_PHYSICAL1_ROWS : TR_PHYSICAL1_ROWS;
+    }
+
+    const FR_PHYSICAL1_MANUAL_RANDOM_MAP = Object.freeze({
+      tensileElongation: "chemical",
+      ionicImpurity: "chemical",
+      crosslinkInner: "chemical",
+      crosslinkFiller: "chemical",
+      crosslinkOuter: "chemical",
+      environmentCold: "extrusion",
+      environmentOil: "extrusion",
+      environmentFlameSheath: "extrusion",
+      environmentOxygenIndex: "extrusion",
+      environmentCorrosivity: "extrusion",
+      environmentToxicity: "extrusion",
+      environmentSmokeDensity: "extrusion",
+    });
+
+    function trFRManualRandomSampleCount(itemId) {
+      const raw = String(trRandomState.qty[itemId] ?? "").trim();
+      const count = Number(raw);
+      return /^\d+$/.test(raw) && Number.isSafeInteger(count) && count > 0 ? count : 0;
+    }
+
+    function trPhysical1RowSampleInfo(row, { askLowDrum = true, materialName = activeTRMaterial } = {}) {
+      const base = trPhysicalSampleInfo(row.pattern, { askLowDrum });
+      if (materialName !== "FR CNCO-W" || base.status !== "ok") return base;
+      const itemId = FR_PHYSICAL1_MANUAL_RANDOM_MAP[row.id];
+      if (!itemId) return base;
+      const count = trFRManualRandomSampleCount(itemId);
+      return count > 0 ? { status: "ok", count } : { status: "manual", count: 0 };
+    }
+
+    function trPhysical1GroupDisplayName(item, entries, materialName = activeTRMaterial) {
+      if (materialName !== "FR CNCO-W" || item !== "내 환경성 시험") return item;
+      const isApplicable = entry => entry.info.status === "ok" || entry.info.status === "manual";
+      const annualActive = entries.some(entry => entry.row.pattern === "A" && isApplicable(entry));
+      const coldOilActive = entries.some(entry => entry.row.pattern === "C" && isApplicable(entry));
+      if (annualActive) return "내환경성시험";
+      if (coldOilActive) return "내한(유) 시험";
+      return "내환경성시험";
+    }
+
     const TR_PHYSICAL2_LIMIT_ROWS = [
-      { id: "voidMaxLength", section: "절연층 이물질 검사", item: "기공(Void)", sub: "최대길이", criteria: "70 ㎛ 이하", limit: 70 },
-      { id: "voidDensity", section: "절연층 이물질 검사", item: "기공(Void)", sub: "밀도\n(50㎛이상)", criteria: "1.8개/㎤ 이하", limit: 1.8 },
-      { id: "opaqueMaxLength", section: "절연층 이물질 검사", item: "이물질\n불투명", sub: "최대길이", criteria: "100 ㎛ 이하", limit: 100 },
-      { id: "opaqueDensity", section: "절연층 이물질 검사", item: "이물질\n불투명", sub: "밀도\n(50㎛이상)", criteria: "0.9개/㎤ 이하", limit: 0.9 },
-      { id: "amberMaxLength", section: "절연층 이물질 검사", item: "이물질\nAmber", sub: "최대길이", criteria: "200 ㎛ 이하", limit: 200 },
-      { id: "innerVoidMax", section: "반도전층 계면의 보이드 및 돌기 측정", item: "Void(내도)", sub: "최대크기", criteria: "70 ㎛ 이하", limit: 70 },
-      { id: "outerVoidMax", section: "반도전층 계면의 보이드 및 돌기 측정", item: "Void(외도)", sub: "최대크기", criteria: "100 ㎛ 이하", limit: 100 },
-      { id: "innerProjectionInsulation", section: "반도전층 계면의 보이드 및 돌기 측정", item: "돌기(내도→절연체)", sub: "최대크기", criteria: "50 ㎛ 이하", limit: 50 },
-      { id: "innerProjectionSemi", section: "반도전층 계면의 보이드 및 돌기 측정", item: "돌기(내도→반도전층)", sub: "최대크기", criteria: "100 ㎛ 이하", limit: 100 },
-      { id: "outerProjectionInsulation", section: "반도전층 계면의 보이드 및 돌기 측정", item: "돌기(외도→절연체)", sub: "최대크기", criteria: "130 ㎛ 이하", limit: 130 },
-      { id: "outerProjectionSemi", section: "반도전층 계면의 보이드 및 돌기 측정", item: "돌기(외도→반도전층)", sub: "최대크기", criteria: "130 ㎛ 이하", limit: 130 },
-      { id: "innerSemiUneven", section: "반도전층 계면의 보이드 및 돌기 측정", item: "내부 반도전층\n불균일도", sub: "", criteria: "180 ㎛ 이하", limit: 180 },
+      { id: "voidMaxLength", section: "절연층 기공 및 이물질, 내부반도전층 굴곡깊이 검사", item: "기공(Void)", sub: "크기", criteria: "70 μm 이하", limit: 70 },
+      { id: "voidAllowedCount", section: "절연층 기공 및 이물질, 내부반도전층 굴곡깊이 검사", item: "기공(Void)", sub: "허용수량", criteria: "0.05 mm 이상이 15개 / 16㎠", limit: 15, unit: "개 / 16㎠" },
+      { id: "translucentMaxLength", section: "절연층 기공 및 이물질, 내부반도전층 굴곡깊이 검사", item: "이물질\n반투명", sub: "크기", criteria: "250 μm 이하", limit: 250 },
+      { id: "translucentAllowedCount", section: "절연층 기공 및 이물질, 내부반도전층 굴곡깊이 검사", item: "이물질\n반투명", sub: "허용수량", criteria: "0.05 mm 이상이 15개 / 16㎠", limit: 15, unit: "개 / 16㎠" },
+      { id: "opaqueMaxLength", section: "절연층 기공 및 이물질, 내부반도전층 굴곡깊이 검사", item: "이물질\n불투명", sub: "크기", criteria: "100 μm 이하", limit: 100 },
+      { id: "innerSemiUneven", section: "절연층 기공 및 이물질, 내부반도전층 굴곡깊이 검사", item: "내부 반도전층\n굴곡깊이", sub: "", criteria: "180 μm 이하", limit: 180 },
+      { id: "innerProjectionInsulation", section: "반도전층 계면 돌기 검사", item: "내부반도전층", sub: "절연층 쪽", criteria: "76 μm 이하", limit: 76 },
+      { id: "innerProjectionSemi", section: "반도전층 계면 돌기 검사", item: "내부반도전층", sub: "반도전층 쪽", criteria: "180 μm 이하", limit: 180 },
+      { id: "outerProjectionInsulation", section: "반도전층 계면 돌기 검사", item: "외부반도전층", sub: "절연층 쪽", criteria: "130 μm 이하", limit: 130 },
+      { id: "outerProjectionSemi", section: "반도전층 계면 돌기 검사", item: "외부반도전층", sub: "반도전층 쪽", criteria: "130 μm 이하", limit: 130 },
     ];
 
     const trPhysical1Values = {};
     const trPhysical2Values = {};
     let trInstituteTargetRow = "";
+    let trInstituteTargetKind = "result";
     let trVolumeRemoteTest = false; // 반도전층 체적저항율 원격시험 여부
 
     function saveTRPhysical1State() {
@@ -6293,8 +6613,9 @@
     }
 
     function trPhysicalDropdownOptions(selected) {
+      const normalizedSelected = selected === "기타" ? "데이터 입력" : selected;
       return [`<option value="">선택</option>`]
-        .concat(TR_PHYSICAL1_DROPDOWN_OPTIONS.map(option => `<option value="${option}"${selected === option ? " selected" : ""}>${option}</option>`))
+        .concat(TR_PHYSICAL1_DROPDOWN_OPTIONS.map(option => `<option value="${option}"${normalizedSelected === option ? " selected" : ""}>${option}</option>`))
         .join("");
     }
 
@@ -6358,7 +6679,7 @@
 
       const lockedByStep5 = row.type === "autoDropdown" && evaluation.detailFail;
       const saved = trPhysical1Value(`${sampleRowId}:result`);
-      const selected = lockedByStep5 ? "불량" : (saved || "");
+      const selected = lockedByStep5 ? "불량" : (saved === "기타" ? "데이터 입력" : (saved || ""));
       const customValue = trPhysical1Value(`${sampleRowId}:custom`);
       const agencyText = trPhysicalAgencyText(sampleRowId);
       return `
@@ -6366,10 +6687,19 @@
           <select data-tr-phys1-key="${trAttr(`${sampleRowId}:result`)}" data-tr-phys1-result-select="${trAttr(sampleRowId)}"${lockedByStep5 ? ' data-tr-phys1-auto-result="1" disabled class="tr-physical-locked"' : ""}>
             ${trPhysicalDropdownOptions(selected)}
           </select>
-          <input class="tr-physical-custom" data-tr-phys1-key="${trAttr(`${sampleRowId}:custom`)}" data-tr-phys1-custom="${trAttr(sampleRowId)}" type="text" placeholder="기타 입력" value="${trAttr(customValue)}"${selected === "기타" ? "" : " hidden disabled"} />
+          <input class="tr-physical-custom" data-tr-phys1-key="${trAttr(`${sampleRowId}:custom`)}" data-tr-phys1-custom="${trAttr(sampleRowId)}" type="text" placeholder="데이터 입력" value="${trAttr(customValue)}"${selected === "데이터 입력" ? "" : " hidden disabled"} />
           <input class="tr-physical-agency-display" data-tr-phys1-agency-display="${trAttr(sampleRowId)}" type="text" readonly value="${trAttr(agencyText)}"${selected === "공인기관 시험의뢰" ? "" : " hidden"} />
         </div>
       `;
+    }
+
+    function trPhysical1CriteriaHtml(row) {
+      if (Array.isArray(row.criteriaParts) && row.criteriaParts.length) {
+        return `<div class="tr-physical-criteria-split">${row.criteriaParts.map(part => `
+          <div><b>${trEsc(part.label)}</b><span>${trEsc(part.value)}</span></div>
+        `).join("")}</div>`;
+      }
+      return trEsc(row.criteria || "").replace(/\n/g, "<br>");
     }
 
     function renderTRPhysical1Step4() {
@@ -6378,15 +6708,18 @@
       if (!container) return;
       if (el.trPhysical1SpecPill) el.trPhysical1SpecPill.textContent = el.trItemDetail?.value ? `규격: ${el.trItemDetail.value}` : activeTRMaterial;
       if (el.trPhysical1SpecNote) {
-        el.trPhysical1SpecNote.textContent = "시료 수량은 Step1(드럼수량·품질등급·시험검사 유형·재시험 여부)에 따라 자동 산출됩니다. Step5 검사값이 기준을 초과한 시료는 절연층 및 반도전층 검사가 불량으로 잠깁니다.";
+        el.trPhysical1SpecNote.textContent = isFRCNCOMaterial()
+          ? "화학분석시험 및 내한(유)·내환경성시험의 시료 수량은 랜덤발취에서 수기로 입력합니다. 나머지는 Step1 조건에 따라 자동 산출됩니다."
+          : "시료 수량은 Step1(드럼수량·품질등급·시험검사 유형·재시험 여부)에 따라 자동 산출됩니다. Step5 검사값이 기준을 초과한 시료는 절연층 및 반도전층 검사가 불량으로 잠깁니다.";
       }
 
       // 항목별 시료수량(index 공식) 산출
-      const infos = TR_PHYSICAL1_ROWS.map(row => trPhysicalSampleInfo(row.pattern));
+      const physical1Rows = getTRPhysical1Rows();
+      const infos = physical1Rows.map(row => trPhysical1RowSampleInfo(row));
 
       // 연속된 동일 시험항목(item)을 그룹으로 묶음
       const groups = [];
-      TR_PHYSICAL1_ROWS.forEach((row, index) => {
+      physical1Rows.forEach((row, index) => {
         const last = groups[groups.length - 1];
         if (last && last.item === row.item) last.leaves.push({ row, index });
         else groups.push({ item: row.item, leaves: [{ row, index }] });
@@ -6394,13 +6727,13 @@
 
       const dmCellHtml = (rowId, sampleNo, info, rowspan = 1) => {
         const rs = rowspan > 1 ? ` rowspan="${rowspan}"` : "";
-        if (info.status === "na" || info.status === "omit") return `<td${rs}></td>`;
+        if (info.status !== "ok") return `<td${rs}></td>`;
         // D/M No.는 수기 입력 불가, 랜덤발취 시료값을 그대로 표시(읽기전용)
         return `<td${rs}><input class="tr-physical-dm-random" type="text" readonly placeholder="랜덤발취" value="${trAttr(trPhysical1DmFromRandom(rowId, sampleNo))}" /></td>`;
       };
       const resultOnlyHtml = (row, sampleRowId, info, sampleNo) => {
-        if (info.status === "na" || info.status === "omit") {
-          const label = info.status === "omit" ? "생략" : "미해당";
+        if (info.status !== "ok") {
+          const label = info.status === "omit" ? "생략" : info.status === "manual" ? "랜덤발취 수량 입력" : "미해당";
           return `<td class="tr-physical-disabled">${label}</td>`;
         }
         const evalForSample = calcTRPhysical2Evaluation(sampleNo);
@@ -6408,10 +6741,57 @@
       };
 
       let bodyHtml = "";
+      const frDmLast = isFRCNCOMaterial();
       groups.forEach(group => {
         const leaves = group.leaves;
         const hasSub = leaves.some(leaf => leaf.row.sub);
-        const info = infos[leaves[0].index]; // 그룹 내 패턴 동일
+        const entries = leaves.map(leaf => ({ ...leaf, info: infos[leaf.index] }));
+        const itemName = trPhysical1GroupDisplayName(group.item, entries);
+        const itemHtml = trEsc(itemName).replace(/\n/g, "<br>");
+
+        // FR 내환경성 묶음은 내한·내유(C)와 환경성 5종(A)의 활성 기준이 다르다.
+        // 활성 행만 시료별로 반복하고, 미해당 행은 한 번만 회색으로 표시한다.
+        if (frDmLast && group.item === "내 환경성 시험") {
+          const activeEntries = entries.filter(entry => entry.info.status === "ok");
+          const inactiveEntries = entries.filter(entry => entry.info.status !== "ok");
+          const renderN = activeEntries.length ? Math.max(...activeEntries.map(entry => entry.info.count || 0)) : 0;
+          const totalRows = (activeEntries.length * renderN) + inactiveEntries.length;
+          let firstCell = true;
+
+          for (let sampleNo = 1; sampleNo <= renderN; sampleNo += 1) {
+            activeEntries.forEach((entry, activeIndex) => {
+              const row = entry.row;
+              const sampleRowId = `${row.id}#${sampleNo}`;
+              let cells = "";
+              if (firstCell) {
+                cells += `<td class="tr-physical-item" rowspan="${totalRows}">${itemHtml}</td>`;
+                firstCell = false;
+              }
+              cells += `<td class="tr-physical-sub">${trEsc(row.sub || "").replace(/\n/g, "<br>")}</td>`;
+              cells += `<td>${trPhysical1CriteriaHtml(row)}</td>`;
+              if (activeIndex === 0) cells += dmCellHtml(row.id, sampleNo, entry.info, activeEntries.length);
+              cells += resultOnlyHtml(row, sampleRowId, entry.info, sampleNo);
+              bodyHtml += `<tr>${cells}</tr>`;
+            });
+          }
+
+          inactiveEntries.forEach((entry, inactiveIndex) => {
+            const row = entry.row;
+            let cells = "";
+            if (firstCell) {
+              cells += `<td class="tr-physical-item" rowspan="${totalRows}">${itemHtml}</td>`;
+              firstCell = false;
+            }
+            cells += `<td class="tr-physical-sub">${trEsc(row.sub || "").replace(/\n/g, "<br>")}</td>`;
+            cells += `<td>${trPhysical1CriteriaHtml(row)}</td>`;
+            if (inactiveIndex === 0) cells += `<td rowspan="${inactiveEntries.length}"></td>`;
+            cells += resultOnlyHtml(row, `${row.id}#1`, entry.info, 1);
+            bodyHtml += `<tr>${cells}</tr>`;
+          });
+          return;
+        }
+
+        const info = entries[0].info; // 그 외 묶음은 기존과 같이 동일 패턴
         const renderN = info.status === "ok" ? info.count : 1;
 
         if (hasSub) {
@@ -6426,13 +6806,18 @@
               const sampleRowId = `${row.id}#${sampleNo}`;
               let cells = "";
               if (firstCell) {
-                cells += `<td class="tr-physical-item" rowspan="${totalRows}">${row.item}</td>`;
+                cells += `<td class="tr-physical-item" rowspan="${totalRows}">${itemHtml}</td>`;
                 firstCell = false;
               }
-              cells += `<td class="tr-physical-sub">${row.sub}</td>`;
-              cells += `<td>${row.criteria}</td>`;
-              if (li === 0) cells += dmCellHtml(row.id, sampleNo, info, leaves.length);
-              cells += resultOnlyHtml(row, sampleRowId, info, sampleNo);
+              cells += `<td class="tr-physical-sub">${trEsc(row.sub || "").replace(/\n/g, "<br>")}</td>`;
+              cells += `<td>${trPhysical1CriteriaHtml(row)}</td>`;
+              if (frDmLast) {
+                if (li === 0) cells += dmCellHtml(row.id, sampleNo, info, leaves.length);
+                cells += resultOnlyHtml(row, sampleRowId, info, sampleNo);
+              } else {
+                if (li === 0) cells += dmCellHtml(row.id, sampleNo, info, leaves.length);
+                cells += resultOnlyHtml(row, sampleRowId, info, sampleNo);
+              }
               bodyHtml += `<tr>${cells}</tr>`;
             });
           }
@@ -6444,11 +6829,16 @@
             const sampleRowId = `${row.id}#${sampleNo}`;
             let cells = "";
             if (s === 0) {
-              cells += `<td class="tr-physical-item" colspan="2" rowspan="${renderN}">${row.item}</td>`;
-              cells += `<td rowspan="${renderN}">${row.criteria}</td>`;
+              cells += `<td class="tr-physical-item" colspan="2" rowspan="${renderN}">${itemHtml}</td>`;
+              cells += `<td rowspan="${renderN}">${trPhysical1CriteriaHtml(row)}</td>`;
             }
-            cells += dmCellHtml(row.id, sampleNo, info, 1);
-            cells += resultOnlyHtml(row, sampleRowId, info, sampleNo);
+            if (frDmLast) {
+              cells += dmCellHtml(row.id, sampleNo, info, 1);
+              cells += resultOnlyHtml(row, sampleRowId, info, sampleNo);
+            } else {
+              cells += dmCellHtml(row.id, sampleNo, info, 1);
+              cells += resultOnlyHtml(row, sampleRowId, info, sampleNo);
+            }
             bodyHtml += `<tr>${cells}</tr>`;
           }
         }
@@ -6588,7 +6978,7 @@
                 const valueCols = Array.from({ length: n }, (_, i) =>
                   lockLabel
                     ? `<td class="tr-physical-disabled">${lockLabel}</td>`
-                    : `<td>${trPhysical2NumberInput(`${row.id}#${i + 1}`, `data-tr-phys2-limit="${row.limit}" data-tr-phys2-unit="${trAttr(trPhysical2CriteriaUnit(row.criteria))}"`, "text")}</td>`
+                    : `<td>${trPhysical2NumberInput(`${row.id}#${i + 1}`, `data-tr-phys2-limit="${row.limit}" data-tr-phys2-unit="${trAttr(row.unit || trPhysical2CriteriaUnit(row.criteria))}"`, "text")}</td>`
                 ).join("");
                 return `
                   <tr>
@@ -6640,13 +7030,13 @@
         el.trPhysical2SpecNote.textContent = "시료 수량은 Step1 기준으로 자동 산출됩니다. 빈 입력칸은 판정에서 제외되며, 기준을 초과한 시험결과는 빨간 글씨로 표시됩니다.";
       }
       const volInfo = trPhysicalSampleInfo("B");
-      const defInfo = trPhysicalSampleInfo("A");
-      const impurityRows = TR_PHYSICAL2_LIMIT_ROWS.filter(row => row.section === "절연층 이물질 검사");
-      const voidRows = TR_PHYSICAL2_LIMIT_ROWS.filter(row => row.section === "반도전층 계면의 보이드 및 돌기 측정");
+      const defInfo = trPhysicalSampleInfo(isFRCNCOMaterial() ? "C" : "A");
+      const impurityRows = TR_PHYSICAL2_LIMIT_ROWS.filter(row => row.section === "절연층 기공 및 이물질, 내부반도전층 굴곡깊이 검사");
+      const voidRows = TR_PHYSICAL2_LIMIT_ROWS.filter(row => row.section === "반도전층 계면 돌기 검사");
       const lockOf = info => info.status === "ok" ? "" : (info.status === "omit" ? "생략" : "미해당");
       const section1 = renderTRPhysical2Section1(volInfo.count, lockOf(volInfo));
-      const section2 = renderTRPhysical2LimitSection("2. 절연층 이물질 검사", impurityRows, defInfo.count, "dmImpurity", lockOf(defInfo));
-      const section3 = renderTRPhysical2LimitSection("3. 반도전층 계면의 보이드 및 돌기 측정", voidRows, defInfo.count, "dmVoid", lockOf(defInfo));
+      const section2 = renderTRPhysical2LimitSection("2. 절연층 기공 및 이물질, 내부반도전층 굴곡깊이 검사", impurityRows, defInfo.count, "dmImpurity", lockOf(defInfo));
+      const section3 = renderTRPhysical2LimitSection("3. 반도전층 계면 돌기 검사", voidRows, defInfo.count, "dmVoid", lockOf(defInfo));
       container.innerHTML = `
         <div class="tr-physical-grid">
           ${section1}
@@ -6681,7 +7071,7 @@
           toggleTRPhysical1Dropdown(select);
           saveTRPhysical1State();
           recalcTRPhysical1Validation();
-          if (select.value === "공인기관 시험의뢰") openTRInstituteModal(select.dataset.trPhys1ResultSelect);
+          if (select.value === "공인기관 시험의뢰") openTRInstituteModal(select.dataset.trPhys1ResultSelect, "result");
         });
       });
       container.querySelectorAll("[data-tr-phys1-agency-number-mode]").forEach(select => {
@@ -6690,7 +7080,7 @@
           const sampleRowId = select.dataset.trPhys1AgencyNumberMode;
           const requestAgency = select.value === "공인기관 시험의뢰";
           renderTRPhysical1Step4();
-          if (requestAgency) openTRInstituteModal(sampleRowId);
+          if (requestAgency) openTRInstituteModal(sampleRowId, "mode");
         });
       });
       recalcTRPhysical1Validation();
@@ -6702,7 +7092,7 @@
       const container = el.trPhysical1Container;
       if (!container) return;
       const rowById = {};
-      TR_PHYSICAL1_ROWS.forEach(r => { rowById[r.id] = r; });
+      getTRPhysical1Rows().forEach(r => { rowById[r.id] = r; });
       container.querySelectorAll("[data-tr-phys1-key]").forEach(control => {
         const key = control.dataset.trPhys1Key || "";
         const [sampleRowId, suffix] = key.split(":");
@@ -6772,7 +7162,7 @@
       const custom = cell?.querySelector(`[data-tr-phys1-custom="${rowId}"]`);
       const agencyDisplay = cell?.querySelector(`[data-tr-phys1-agency-display="${rowId}"]`);
       if (custom) {
-        const showCustom = select.value === "기타";
+        const showCustom = select.value === "데이터 입력";
         custom.hidden = !showCustom;
         custom.disabled = !showCustom;
         if (!showCustom) custom.value = "";
@@ -6784,8 +7174,9 @@
       }
     }
 
-    function openTRInstituteModal(rowId) {
+    function openTRInstituteModal(rowId, targetKind = "result") {
       trInstituteTargetRow = rowId || "";
+      trInstituteTargetKind = targetKind === "mode" ? "mode" : "result";
       if (!trInstituteTargetRow || !el.trInstituteModal) return;
       const agency = trPhysical1Value(`${trInstituteTargetRow}:agency`) || "KERI";
       const isKnown = TR_PUBLIC_INSTITUTE_OPTIONS.includes(agency);
@@ -6795,8 +7186,19 @@
       el.trInstituteModal.classList.add("active");
     }
 
-    function closeTRInstituteModal() {
+    function closeTRInstituteModal({ restoreSelection = true } = {}) {
+      const rowId = trInstituteTargetRow;
+      const modalWasOpen = !!el.trInstituteModal?.classList.contains("active");
+      if (modalWasOpen && restoreSelection && rowId) {
+        trPhysical1Values[`${rowId}:${trInstituteTargetKind}`] = "";
+        if (trPhysical1Values[`${rowId}:result`] === "공인기관 시험의뢰") trPhysical1Values[`${rowId}:result`] = "";
+        delete trPhysical1Values[`${rowId}:agency`];
+        delete trPhysical1Values[`${rowId}:agencyCustom`];
+      }
       if (el.trInstituteModal) el.trInstituteModal.classList.remove("active");
+      trInstituteTargetRow = "";
+      trInstituteTargetKind = "result";
+      if (modalWasOpen && document.getElementById("trStep4")?.classList.contains("active")) renderTRPhysical1Step4();
     }
 
     function toggleTRInstituteCustom() {
@@ -6818,10 +7220,10 @@
         return;
       }
       trPhysical1Values[`${trInstituteTargetRow}:result`] = "공인기관 시험의뢰";
+      if (trInstituteTargetKind === "mode") trPhysical1Values[`${trInstituteTargetRow}:mode`] = "공인기관 시험의뢰";
       trPhysical1Values[`${trInstituteTargetRow}:agency`] = selected;
       trPhysical1Values[`${trInstituteTargetRow}:agencyCustom`] = selected === "기타" ? custom : "";
-      closeTRInstituteModal();
-      if (document.getElementById("trStep4")?.classList.contains("active")) renderTRPhysical1Step4();
+      closeTRInstituteModal({ restoreSelection: false });
     }
 
     function trNeutralAreaValue(sampleNo) {
@@ -6848,11 +7250,11 @@
     function recalcTRStructure() {
       saveTRStructureState();
       document.querySelectorAll("[data-tr-result-row][data-tr-result-drum]").forEach(cell => {
-        const row = TR_STRUCTURE_TABLE_ROWS.find(item => item.id === cell.dataset.trResultRow);
+        const row = getTRStructureTableRows().find(item => item.id === cell.dataset.trResultRow);
         const sampleNo = Number(cell.dataset.trResultDrum);
         if (row) {
           cell.textContent = trResultValue(row, sampleNo);
-          const s = TR_STRUCTURE_CRITERIA[el.trItemDetail?.value || ""];
+          const s = getTRStructureCriteria();
           const area = row.result === "neutralArea" ? trNeutralAreaValue(sampleNo) : NaN;
           cell.classList.toggle("tr-structure-bad", !!s && Number.isFinite(area) && area < s.neutralAreaMin);
         }
@@ -6897,7 +7299,7 @@
     function recalcTRStructureValidation() {
       const container = el.trStructureContainer;
       if (!container) return;
-      const s = TR_STRUCTURE_CRITERIA[el.trItemDetail?.value || ""];
+      const s = getTRStructureCriteria();
       if (!s) return;
       container.querySelectorAll('[data-tr-kind="measure"]').forEach(input => {
         const bounds = trStructureBounds(s, input.dataset.trRow);
@@ -7019,7 +7421,7 @@
     }
 
     function trStructureTableDisplayRowCount() {
-      return TR_STRUCTURE_TABLE_ROWS.reduce((sum, row) => {
+      return getTRStructureTableRows().reduce((sum, row) => {
         if (row.mode === "formula") return sum + 1;
         if (row.mode === "six") return sum + (row.result ? 3 : 2);
         return sum + (row.result ? 2 : 1);
@@ -7068,7 +7470,7 @@
       sampleNos.forEach(sampleNo => {
         const dmNoInput = el.trStructureContainer.querySelector(`[data-tr-dm-no="${sampleNo}"]`);
         if (dmNoInput) ordered.push(dmNoInput);
-        TR_STRUCTURE_TABLE_ROWS.forEach(row => {
+        getTRStructureTableRows().forEach(row => {
           if (row.mode === "formula") return;
           const measures = Array.from(el.trStructureContainer.querySelectorAll(`[data-tr-row="${row.id}"][data-tr-kind="measure"][data-tr-drum="${sampleNo}"]`));
           if (row.mode === "pitch") {
@@ -7110,7 +7512,7 @@
     function renderTRStructureStep2() {
       if (!el.trStructureContainer) return;
       const spec = el.trItemDetail?.value || "";
-      const criteria = TR_STRUCTURE_CRITERIA[spec];
+      const criteria = getTRStructureCriteria(spec);
       if (!criteria) {
         el.trStructureContainer.innerHTML = `<div class="mini">Step1에서 규격을 먼저 선택해 주세요.</div>`;
         if (el.trStructureSpecNote) el.trStructureSpecNote.textContent = "규격 선택 후 구조 검사 입력칸이 생성됩니다.";
@@ -7127,7 +7529,7 @@
           : `구조검사 시료 수량: ${sampleInfo.label}`;
         if (el.trStructureSpecNote) el.trStructureSpecNote.textContent = message;
         const omitted = sampleInfo.label === "생략";
-        const omittedLeftRows = omitted ? TR_STRUCTURE_TABLE_ROWS.map(row => renderTRLeftTableRow(row, criteria)).join("") : "";
+        const omittedLeftRows = omitted ? getTRStructureTableRows().map(row => renderTRLeftTableRow(row, criteria)).join("") : "";
         const omittedSampleRows = omitted ? renderTROmittedStructureSampleRows(3) : "";
         el.trStructureContainer.innerHTML = `
           <div class="mini" style="margin-bottom:10px;">${message}</div>
@@ -7178,7 +7580,7 @@
                 <tr><th class="tr-sample-no-label" colspan="2">시료번호</th></tr>
               </thead>
               <tbody>
-                ${TR_STRUCTURE_TABLE_ROWS.map(row => renderTRLeftTableRow(row, criteria)).join("")}
+                ${getTRStructureTableRows().map(row => renderTRLeftTableRow(row, criteria)).join("")}
               </tbody>
             </table>
           </div>
@@ -7191,7 +7593,7 @@
                 <tr>${headerGroups}</tr>
               </thead>
               <tbody>
-                ${TR_STRUCTURE_TABLE_ROWS.map(row => renderTRSampleTableRow(row, sampleCount)).join("")}
+                ${getTRStructureTableRows().map(row => renderTRSampleTableRow(row, sampleCount)).join("")}
               </tbody>
             </table>
           </div>
@@ -7323,38 +7725,29 @@
 
     const TR_ANNUAL_SHEETS = [
       {
-        id: "insulSemi", title: "절연층 및 반도전층 검사", text: true, photos: true,
-        method: "○ 절연층 이물질 검사\n케이블의 연속압출 조장의 양단에서 길이 약 5 cm의 시료를 취하여 두께 약 0.64 mm의 나선형 또는 Slice형의 시편을 연속 20매 준비하고 알코올 등으로 표면을 깨끗이 한 후 (Void 검사 시료는 관찰이 용이하도록 적당한 염색을 하여도 좋다), 현미경으로 5∼20배 확대하여 관찰하여 1차 검사를 하고, 1차 검사시 발견된 이상 부분을 100배 정도로 확대하여 그 크기를 측정한다.\n\n○ 반도전층 계면의 보이드 및 돌기 측정\n반도전층과 절연층과의 계면에서의 보이드의 최대크기는 내부 반도전층은 70 μm, 외부반도전층은 100 μm 이하이어야 한다. 반도전층과 절연층과의 경계면은 평활하여야 하며, 내부 반도전층의 경계면에서 절연체로 향한 돌기는 50 μm 이하, 반도전층으로 향한 돌기는 100 μm 이하이어야 하고, 외부 반도전층의 경계면에서는 절연체 및 반도전층으로 향한 돌기는 모두 130 μm 이하이어야 한다. 측정방법은 상기 (2)항에 의한다. 단, 돌기는 높이가 폭의 1/2 이상인 것만 계수한다.",
+        id: "flameSheath", title: "난연성(시스)", text: true, photos: true,
+        method: "ES-6145-0019의 8.4.6항에 따라 ES-6145-0028의 3.4.7항의 (2) 방법으로 시스의 난연성을 시험한다. 불꽃이 상부 케이블의 Tray 전체 높이까지 연소하지 않는지 확인한다.",
+        frMethod: "ES-6145-0019의 7.3.4.6항에 따라 ES-6145-0028의 3.4.7항의 (2) 방법으로 시스의 난연성을 시험한다.\n불꽃이 상부 케이블의 Tray 전체 높이까지 연소하지 않는지 확인한다.",
       },
       {
-        id: "unevenness", title: "불균일도 측정", text: true, photos: true,
-        method: "케이블을 약 60㎝ 길이로 잘라 외부 반도전층은 제거하고 유조에서 가열하는등의 적당한 방법으로 약 120℃로 가열하여 절연체가 투명하도록 한 후, 내부 반도전층의 평활도 및 불순물을 1-10배의 비율로 조사한다. 내부 반도전층은 평활하고 원형이어야 한다. 절연체 내의 불순물이나 내부 반도전층의 돌기 또는 변형부가 발견되면 절연체 위에 표시하고 절연체 이물질 검사를 하고, 내부 반도전층이 도체의 소선 표면을 따라 형성되는 정도를 나타내는 형상지수는 180㎛ 이하이어야 한다.",
+        id: "smokeDensitySheath", title: "연기밀도(시스)", text: true, photos: true,
+        method: "ES-6145-0019의 8.4.11항에 따라 ES-6145-0028의 3.4.7항의 (7) 방법으로 연기밀도를 시험한다. 빛투과율이 60% 이상인지 확인한다.",
+        frMethod: "ES-6145-0019의 7.3.4.11항에 따라 ES-6145-0028의 3.4.7항의 (7) 방법으로 연기밀도를 시험한다. 빛투과율이 60% 이상인지 확인한다.",
       },
       {
-        id: "volumeResistivity", title: "반도전층 체적저항", volume: true, photos: true,
+        id: "volumeResistivity", title: "반도전층 체적저항률", volume: true, photos: true, frCycle: "분기시험",
         method: "케이블의 내부 도체 및 절연체 반도전층의 체적저항률은 적당한 길이로 케이블을 잘라 시험을 실시한다. 내부 반도전층은 케이블을 반으로 잘라 사용하며, 외부 반도전층은 외피층 및 중성선 도체 등을 제거한 상태로 측정을 한다. 시험방법은 IEC 60502-2의 18.2.10항에 따라 실시하며, 해당 규격의 기준치에 만족해야 한다. 시험은 정상 동작 시 최대 도체온도의 ±2℃이내의 온도에서 실시하며, 예열된 오븐에 넣고 6시간이 경과한 후에 측정한다.",
+        frMethod: "케이블의 내부 도체 및 절연체 반도전층의 체적저항률은 적당한 길이로 케이블을 잘라 시험을 실시한다.\n내부 반도전층은 케이블을 반으로 잘라 사용하며, 외부 반도전층은 외피층 및 중성선 도체 등을 제거한 상태로 측정을 한다.\n시험방법은 IEC 60502-2의 18.2.10항에 따라 실시하며, 해당 규격의 기준치에 만족해야 한다.\n시험은 정상 동작 시 최대 도체온도의 ±2℃이내의 온도에서 실시하며, 예열된 오븐에 넣고 6시간이 경과한 후에 측정한다.",
       },
       {
-        id: "thermalStab", title: "열적안정화", photos: true,
-        method: "가교중 절연체 내에 생성된 휘발성분들은 유전정접과 교류 파괴 시험결과에 영향을 미치므로 이 영향을 최소화하기 위해 시험 전에 열적 안정화가 필요하다.\n시료를 공기 오븐 내에 넣고 75 ℃에서 72시간 유지하거나, 도체에 전류를 흘려 도체온도 90 ℃에서 72시간 유지한다. 시료는 공기 중에 매달아 놓으며, 전압은 인가하지 않는다. 시료의 길이는 최소 8 m 이상이어야 한다.",
-      },
-      {
-        id: "dielectricTemp", title: "유전정접 온도특성", dielectric: true, photos: true,
-        method: "시료의 유전정접은 13.2 kV를 인가하고 교류전류를 인가하여 도체온도 90 °C, 130 °C, 상 온의 순서로 측정한다. 시료는 기중에 매달아야 하며, 유전정접은 상기 온도에 도달하여 안정화된 이후에 측정하되, 가급적 짧은 시간 내에 기준온도에 도달하여야 한다. 모든 경우에 유전정접은 0.5 % 이하이어야 한다.",
-      },
-      {
-        id: "acBreakdown", title: "교류파괴", text: true, photos: true,
-        method: "유전정접 측정 후 장기과통전 시험의 교류 파괴 시험에 의해 시험하며, 123 kV 이하에서 절연파괴 시 불합격 처리한다. 케이블의 절연파괴 전압 및 파괴부의 절연체 두께를 측정하여 기록한다.",
+        id: "conductorWater", title: "도체수밀", text: true, photos: true,
+        method: "완제품 케이블의 시료를 외피,중성선 및 부풀음 테이프를 제거한 후 절연된 상태의 시료를 0.5기압의 수압 인가 가능한장치를 사용하여 24시간 가하여 타단으로 부터의 누수유무를 조사한다. 단, 물은 육안으로 식별이 가능한 색을 갖는다.",
+        methodFigure: TR_CONDUCTOR_WATER_METHOD_FIGURE,
       },
       {
         id: "neutralWater", title: "중성선 수밀", text: true, photos: true,
         method: "IEC 60502-2의 19.24항에 따르며, 시험방법 및 판정은 해당규격의 부속서 F에 따른다.",
         methodFigure: TR_NEUTRAL_WATER_METHOD_FIGURE,
-      },
-      {
-        id: "conductorWater", title: "도체 수밀", text: true, photos: true,
-        method: "완제품 케이블의 시료를 외피,중성선 및 부풀음 테이프를 제거한 후 절연된 상태의 시료를 0.5기압의 수압 인가 가능한장치를 사용하여 24시간 가하여 타단으로 부터의 누수유무를 조사한다. 단, 물은 육안으로 식별이 가능한 색을 갖는다.",
-        methodFigure: TR_CONDUCTOR_WATER_METHOD_FIGURE,
       },
     ];
 
@@ -7381,10 +7774,23 @@
       return TR_CERTIFICATE_TYPES.filter(type => !type.exemptOnly || trIsInspectionExempt());
     }
 
+    function trActivePeriodicSheets(materialName = activeTRMaterial) {
+      if (!isFRCNCOMaterial(materialName)) return TR_ANNUAL_SHEETS;
+      return TR_ANNUAL_SHEETS.filter(sheet => {
+        const pattern = sheet.id === "volumeResistivity" ? "B" : "A";
+        return trPhysicalSampleInfo(pattern, { askLowDrum: false }).status === "ok";
+      });
+    }
+
+    function trPeriodicCycleLabel(sheet, materialName = activeTRMaterial) {
+      return isFRCNCOMaterial(materialName) && sheet.frCycle ? sheet.frCycle : "연1회 시험";
+    }
+
     function trAnnualVisible() {
       const grade = el.trQualityGrade?.value || "";
       const type = getTRInspectionTypeForSampling();
       if (!grade || !type) return false;
+      if (isFRCNCOMaterial()) return trActivePeriodicSheets().length > 0;
       if (type === "연1회") return true;
       if ((grade === "C" || grade === "D") && type === "반기") return true;
       return false;
@@ -7394,6 +7800,14 @@
       const vis = trAnnualVisible();
       if (el.btnTRStep6) el.btnTRStep6.style.display = vis ? "" : "none";
       if (el.btnTRGoStep6) el.btnTRGoStep6.style.display = vis ? "" : "none";
+      const periodicTitle = isFRCNCOMaterial() ? "주기시험 항목" : "연1회 시험항목";
+      if (el.btnTRStep6) el.btnTRStep6.textContent = `Step6 ${periodicTitle}`;
+      const periodicHeading = document.querySelector("#trStep6 h3");
+      if (periodicHeading) periodicHeading.textContent = `Step6 ${periodicTitle}`;
+      const periodicNote = document.getElementById("trAnnualNote");
+      if (periodicNote) periodicNote.textContent = isFRCNCOMaterial()
+        ? "품질등급과 시험종류에 따라 활성화되는 분기·연1회 시험항목입니다. 시험방법은 고정 표시되며, 결과·사진을 입력합니다."
+        : "연1회(또는 C·D등급 반기) 시험 시 작성하는 항목입니다. 시험방법은 고정 표시되며, 결과·사진을 입력합니다.";
       // 시험사진 스텝 번호: Step6 표시 시 Step7, 미표시 시 Step6
       const photoStepNo = vis ? "7" : "6";
       if (el.btnTRStep7) el.btnTRStep7.textContent = `Step${photoStepNo} 시험사진`;
@@ -7486,15 +7900,20 @@
     function renderTRAnnualStep6() {
       const container = el.trAnnualContainer;
       if (!container) return;
-      if (trAnnualActive < 0 || trAnnualActive >= TR_ANNUAL_SHEETS.length) trAnnualActive = 0;
-      const tabs = TR_ANNUAL_SHEETS.map((s, i) =>
-        `<button type="button" class="tr-annual-tab${i === trAnnualActive ? " active" : ""}" data-tr-annual-tab="${i}">${i + 1}. ${s.title}</button>`
+      const sheets = trActivePeriodicSheets();
+      if (trAnnualActive < 0 || trAnnualActive >= sheets.length) trAnnualActive = 0;
+      const tabs = sheets.map((s, i) =>
+        `<button type="button" class="tr-annual-tab${i === trAnnualActive ? " active" : ""}" data-tr-annual-tab="${i}">${trPeriodicCycleLabel(s)} · ${i + 1}. ${s.title}</button>`
       ).join("");
-      const sheet = TR_ANNUAL_SHEETS[trAnnualActive];
+      const sheet = sheets[trAnnualActive];
+      if (!sheet) {
+        container.innerHTML = "";
+        return;
+      }
       container.innerHTML = `
         <div class="tr-annual-tabs">${tabs}</div>
         <section class="tr-annual-sheet">
-          <h4 class="tr-annual-sheet-title">${trAnnualActive + 1}. ${sheet.title}</h4>
+          <h4 class="tr-annual-sheet-title">${trPeriodicCycleLabel(sheet)} · ${trAnnualActive + 1}. ${sheet.title}</h4>
           ${trAnnualSheetBody(sheet)}
         </section>
       `;
@@ -9464,6 +9883,7 @@
       { id: "insulationR", name: "최소 절연저항 측정", type: "singleElec" },
       { id: "capacitance", name: "최대 정전용량 측정", type: "singleElec" },
       { id: "dielectric", name: "유전정접 측정", type: "singleElec" },
+      { id: "impulse", name: "충격내전압(절연체)", type: "frImpulse" },
       { id: "volumeR", name: "반도전층 체적저항율 측정", type: "B" },
       { id: "peel", name: "외부 반도전층 박리 시험", type: "C" },
       { id: "waterN", name: "수밀시험(중성선)", type: "A" },
@@ -9474,6 +9894,11 @@
     ];
 
     function trRandomItemName(item) {
+      if (activeTRMaterial === "FR CNCO-W" && item.id === "dielectric") return "유전정접, 유전정접 온도특성";
+      if (activeTRMaterial === "FR CNCO-W" && item.id === "extrusion") {
+        return trPhysicalSampleInfo("A", { askLowDrum: false }).status === "ok" ? "내환경성시험" : "내한(유) 시험";
+      }
+      if (activeTRMaterial === "FR CNCO-W" && item.id === "chemical") return "화학분석시험(가교도 등)";
       if (item.id !== "chemical") return item.name;
       return trPhysicalSampleInfo("A").status === "ok"
         ? "화학분석시험(외피특성 등)"
@@ -9488,6 +9913,7 @@
       const isSA = grade === "S" || grade === "A";
       const isBCD = grade === "B" || grade === "C" || grade === "D";
       const err = (isSA && type === "분기") || (grade === "B" && type === "반기");
+      const isFR = isFRCNCOMaterial();
       switch (item.type) {
         case "all": {
           if (!Number.isFinite(drum) || drum <= 0) return { status: "na" };
@@ -9497,7 +9923,7 @@
         case "prop": {
           if (!hasBase || err) return { status: "na" };
           const lowDrumOmittable = item.id !== "conductorR";
-          if (lowDrumOmittable && drum <= 3 && getTRLowDrumOmitChoice({ ask: false })) return { status: "omit" };
+          if (!isFR && lowDrumOmittable && drum <= 3 && getTRLowDrumOmitChoice({ ask: false })) return { status: "omit" };
           const div = isSA ? 30 : 15;
           return { status: "ok", count: applyTRRetestCount(Math.max(1, Math.ceil(drum / div))) };
         }
@@ -9507,17 +9933,33 @@
           if (isSA && (type === "반기" || type === "연1회")) ok = true;
           else if (isBCD && (type === "일반" || type === "분기" || type === "반기" || type === "연1회")) ok = true;
           if (!ok) return { status: "na" };
-          if (drum <= 3 && getTRLowDrumOmitChoice({ ask: false })) return { status: "omit" };
+          if (!isFR && drum <= 3 && getTRLowDrumOmitChoice({ ask: false })) return { status: "omit" };
           return { status: "ok", count: applyTRRetestCount(1) };
         }
-        case "A": case "B": case "C":
+        case "frImpulse":
+          return isFR ? trPhysicalSampleInfo("C", { askLowDrum: false }) : { status: "na" };
+        case "A": case "B": case "C": {
+          if (isFR && item.id === "insulSemi") return trPhysicalSampleInfo("C", { askLowDrum: false });
           return trPhysicalSampleInfo(item.type, { askLowDrum: false });
+        }
         case "manualA": {
+          if (isFR) {
+            const coldOil = trPhysicalSampleInfo("C", { askLowDrum: false });
+            const environment = trPhysicalSampleInfo("A", { askLowDrum: false });
+            if (coldOil.status !== "ok" && environment.status !== "ok") return { status: "na" };
+            return { status: "manual", count: trFRManualRandomSampleCount(item.id) };
+          }
           if (trPhysicalSampleInfo("A", { askLowDrum: false }).status !== "ok") return { status: "na" };
           const q = Number(trRandomState.qty[item.id]);
           return { status: "manual", count: (Number.isFinite(q) && q > 0) ? q : 0 };
         }
         case "manualChemical": {
+          if (isFR) {
+            const fixed = trPhysicalSampleInfo("C", { askLowDrum: false });
+            const annual = trPhysicalSampleInfo("A", { askLowDrum: false });
+            if (fixed.status !== "ok" && annual.status !== "ok") return { status: "na" };
+            return { status: "manual", count: trFRManualRandomSampleCount(item.id) };
+          }
           const sheathActive = trPhysicalSampleInfo("A", { askLowDrum: false }).status === "ok";
           const tensileActive = trPhysicalSampleInfo("C", { askLowDrum: false }).status === "ok";
           if (!sheathActive && !tensileActive) return { status: "na" };
@@ -9528,11 +9970,203 @@
       return { status: "na" };
     }
 
+    function trRandomNumberBounds() {
+      const startText = String(trRandomState.start || "").trim();
+      const endText = String(trRandomState.end || "").trim();
+      if (!/^\d+$/.test(startText) || !/^\d+$/.test(endText)) return null;
+      const start = Number(startText);
+      const end = Number(endText);
+      return Number.isSafeInteger(start) && Number.isSafeInteger(end) && start <= end ? { start, end } : null;
+    }
+
+    function trRandomSampleValidationMessage(value, bounds = trRandomNumberBounds()) {
+      const raw = String(value ?? "").trim();
+      if (!raw) return "";
+      if (!bounds) return "제조 시작번호와 끝번호를 먼저 올바르게 입력해 주세요.";
+      if (!/^\d+$/.test(raw) || !Number.isSafeInteger(Number(raw))) return "시료번호는 0 이상의 정수로 입력해 주세요.";
+      const number = Number(raw);
+      if (number < bounds.start || number > bounds.end) return `시료번호는 제조번호 범위 ${bounds.start} ~ ${bounds.end} 안에서 입력해 주세요.`;
+      return "";
+    }
+
+    function trRandomValidationErrors({ includeMissingSamples = false } = {}) {
+      const errors = [];
+      const startText = String(trRandomState.start || "").trim();
+      const endText = String(trRandomState.end || "").trim();
+      if (!startText) errors.push("랜덤발취: 제조 시작번호 미입력");
+      else if (!/^\d+$/.test(startText) || !Number.isSafeInteger(Number(startText))) errors.push("랜덤발취: 제조 시작번호는 0 이상의 정수로 입력");
+      if (!endText) errors.push("랜덤발취: 제조 끝번호 미입력");
+      else if (!/^\d+$/.test(endText) || !Number.isSafeInteger(Number(endText))) errors.push("랜덤발취: 제조 끝번호는 0 이상의 정수로 입력");
+
+      const bounds = trRandomNumberBounds();
+      if (startText && endText && !bounds && /^\d+$/.test(startText) && /^\d+$/.test(endText)) {
+        errors.push("랜덤발취: 제조 끝번호는 시작번호보다 크거나 같아야 함");
+      }
+
+      TR_RANDOM_ITEMS.forEach(item => {
+        const info = trRandomItemInfo(item);
+        if (isFRCNCOMaterial() && (item.id === "chemical" || item.id === "extrusion")
+          && info.status === "manual" && !(info.count > 0)) {
+          errors.push(`랜덤발취: ${trRandomItemName(item)} 시료수량은 1 이상의 정수로 입력`);
+          return;
+        }
+        if ((info.status !== "ok" && info.status !== "manual") || !(info.count > 0)) return;
+        const samples = trRandomState.samples[item.id] || {};
+        for (let sampleNo = 1; sampleNo <= info.count; sampleNo += 1) {
+          const raw = String(samples[sampleNo] ?? "").trim();
+          if (!raw) {
+            if (includeMissingSamples) errors.push(`랜덤발취: ${trRandomItemName(item)} 시료${sampleNo} 번호 미입력`);
+            continue;
+          }
+          if (!bounds) continue;
+          const sampleError = trRandomSampleValidationMessage(raw, bounds);
+          if (sampleError) errors.push(`랜덤발취: ${trRandomItemName(item)} 시료${sampleNo} - ${sampleError}`);
+        }
+      });
+      return errors;
+    }
+
+    function trUpdateRandomValidationGlow() {
+      const container = el.trRandomContainer;
+      if (!container) return;
+      const errors = trRandomValidationErrors();
+      const start = container.querySelector("[data-r-start]");
+      const end = container.querySelector("[data-r-end]");
+      const bounds = trRandomNumberBounds();
+      if (start) start.classList.toggle("tr-need-input", !String(start.value || "").trim() || !/^\d+$/.test(String(start.value || "").trim()) || (!!String(end?.value || "").trim() && !bounds));
+      if (end) end.classList.toggle("tr-need-input", !String(end.value || "").trim() || !/^\d+$/.test(String(end.value || "").trim()) || (!!String(start?.value || "").trim() && !bounds));
+      container.querySelectorAll("[data-r-item][data-r-k]").forEach(input => {
+        const raw = String(input.value || "").trim();
+        input.classList.toggle("tr-need-input", !raw || !!trRandomSampleValidationMessage(raw, bounds));
+      });
+      container.querySelectorAll(".r-qty").forEach(input => {
+        const itemId = input.dataset.rItem;
+        if (!isFRCNCOMaterial() || (itemId !== "chemical" && itemId !== "extrusion")) return;
+        input.classList.toggle("tr-need-input", trFRManualRandomSampleCount(itemId) <= 0);
+      });
+      return errors;
+    }
+
+    function trFRSamplingSnapshot() {
+      return {
+        drum: String(el.trDrumQty?.value || ""),
+        grade: String(el.trQualityGrade?.value || ""),
+        type: String(el.trInspectionType?.value || ""),
+        retest: String(el.trRetestStatus?.value || ""),
+      };
+    }
+
+    function captureFRSamplingState() {
+      trFRAcceptedSamplingState = isFRCNCOMaterial() ? trFRSamplingSnapshot() : null;
+    }
+
+    function trFRSamplingStateEqual(a, b) {
+      return !!a && !!b && a.drum === b.drum && a.grade === b.grade && a.type === b.type && a.retest === b.retest;
+    }
+
+    function trHasFRSamplingData() {
+      const hasObjectValue = obj => Object.values(obj || {}).some(value => String(value ?? "").trim() !== "");
+      const hasNestedSamples = Object.values(trRandomState.samples || {}).some(samples => hasObjectValue(samples));
+      const hasRandomQty = hasObjectValue(trRandomState.qty);
+      const hasElectrical = Object.values(trElectricalValues || {}).some(store => hasObjectValue(store));
+      const hasAnnualPhotos = Object.values(trAnnualPhotos || {}).some(list => Array.isArray(list) && list.length > 0);
+      return hasNestedSamples || hasRandomQty || hasElectrical
+        || hasObjectValue(trStructureValues) || String(trStructureWireMark || "").trim() !== "" || String(trStructureAppearance || "").trim() !== ""
+        || hasObjectValue(trPhysical1Values) || hasObjectValue(trPhysical2Values)
+        || hasObjectValue(trAnnualText) || hasAnnualPhotos;
+    }
+
+    function trPruneFRSamplingData() {
+      // 랜덤발취: 비활성 항목과 새 시료수량을 초과한 번호만 제거한다.
+      TR_RANDOM_ITEMS.forEach(item => {
+        const info = trRandomItemInfo(item);
+        const count = (info.status === "ok" || info.status === "manual") ? Number(info.count) || 0 : 0;
+        if (count <= 0) {
+          delete trRandomState.samples[item.id];
+        } else {
+          const samples = trRandomState.samples[item.id] || {};
+          Object.keys(samples).forEach(key => {
+            if (!Number.isFinite(Number(key)) || Number(key) < 1 || Number(key) > count) delete samples[key];
+          });
+        }
+        if (info.status === "na") delete trRandomState.qty[item.id];
+      });
+
+      const structureInfo = getTRStructureSampleInfo();
+      const structureCount = Number(structureInfo.value) > 0 ? Number(structureInfo.value) : 0;
+      Object.keys(trStructureValues).forEach(key => {
+        const parts = key.split("#");
+        const sampleNo = Number(parts[0] === "bae" ? parts[2] : parts[1]);
+        if (!Number.isFinite(sampleNo) || sampleNo < 1 || sampleNo > structureCount) delete trStructureValues[key];
+      });
+      trRemoveFRExcludedStructureValues();
+
+      const spec = el.trItemDetail?.value || "";
+      if (spec) trPruneTRElectricalState(spec, getTRElectricalSampleInfoMap());
+
+      const activePhysicalRows = new Map(FR_CNCO_PHYSICAL1_ROWS.map(row => [row.id, trPhysical1RowSampleInfo(row)]));
+      Object.keys(trPhysical1Values).forEach(key => {
+        const match = key.match(/^([^#]+)#(\d+):/);
+        if (!match) return;
+        const info = activePhysicalRows.get(match[1]);
+        const sampleNo = Number(match[2]);
+        if (!info || info.status !== "ok" || sampleNo > info.count) delete trPhysical1Values[key];
+      });
+
+      const volumeInfo = trPhysicalSampleInfo("B");
+      const defectInfo = trPhysicalSampleInfo("C");
+      const limitIds = new Set(TR_PHYSICAL2_LIMIT_ROWS.map(row => row.id));
+      Object.keys(trPhysical2Values).forEach(key => {
+        const match = key.match(/^([^#]+)#(\d+)$/);
+        if (!match) return;
+        const info = limitIds.has(match[1]) ? defectInfo : volumeInfo;
+        const sampleNo = Number(match[2]);
+        if (info.status !== "ok" || sampleNo > info.count) delete trPhysical2Values[key];
+      });
+      if (volumeInfo.status !== "ok") trVolumeRemoteTest = false;
+
+      if (trPhysicalSampleInfo("A", { askLowDrum: false }).status !== "ok") {
+        Object.keys(trAnnualText).forEach(key => delete trAnnualText[key]);
+        Object.keys(trAnnualPhotos).forEach(key => delete trAnnualPhotos[key]);
+      }
+    }
+
+    function restoreFRSamplingState(state) {
+      if (!state) return;
+      if (el.trDrumQty) el.trDrumQty.value = state.drum;
+      if (el.trQualityGrade) el.trQualityGrade.value = state.grade;
+      if (el.trInspectionType) el.trInspectionType.value = state.type;
+      if (el.trRetestStatus) el.trRetestStatus.value = state.retest;
+      updateTRSummaryPanel();
+      updateTRRequiredGlow();
+      updateTRAnnualStepVisibility();
+    }
+
+    function handleFRSamplingConfigChange() {
+      if (!isFRCNCOMaterial()) return true;
+      const next = trFRSamplingSnapshot();
+      if (!trFRAcceptedSamplingState) {
+        trFRAcceptedSamplingState = next;
+        return true;
+      }
+      if (trFRSamplingStateEqual(trFRAcceptedSamplingState, next)) return true;
+      if (trHasFRSamplingData()) {
+        const proceed = confirm("Step1의 드럼수량·품질등급·시험종류·재시험 여부를 변경하면 새 기준에서 비활성화되거나 시료수량을 초과하는 기존 입력값이 삭제됩니다.\n\n계속 변경하시겠습니까?");
+        if (!proceed) {
+          restoreFRSamplingState(trFRAcceptedSamplingState);
+          return false;
+        }
+      }
+      trFRAcceptedSamplingState = next;
+      trPruneFRSamplingData();
+      return true;
+    }
+
     // ===== 랜덤발취 → 각 시험 D/M No. 자동 연동 =====
     // 물리1 D/M 병합 그룹(같은 시료 → D/M 1개)
     const TR_PHYSICAL1_DM_GROUPS = {
       semiVolumeInner: "semiVolumeInner", semiVolumeOuter: "semiVolumeInner",
-      dielectric90: "dielectric90", dielectric130: "dielectric90", dielectricRoom: "dielectric90", acBreakdown: "dielectric90",
+      dielectric90: "dielectric90", dielectric130: "dielectric90", dielectric60: "dielectric90", dielectricRoom: "dielectric90", acBreakdown: "dielectric90",
     };
     function trPhysical1DmGroupKey(rowId) { return TR_PHYSICAL1_DM_GROUPS[rowId] || rowId; }
     // 물리1 항목(그룹) → 랜덤발취 시험항목 매핑
@@ -9546,6 +10180,16 @@
       tensileElongation: "chemical",
       ionicImpurity: "chemical",
       sheathProperty: "chemical",
+      crosslinkInner: "chemical",
+      crosslinkFiller: "chemical",
+      crosslinkOuter: "chemical",
+      environmentCold: "chemical",
+      environmentOil: "chemical",
+      environmentFlameSheath: "chemical",
+      environmentOxygenIndex: "chemical",
+      environmentCorrosivity: "chemical",
+      environmentToxicity: "chemical",
+      environmentSmokeDensity: "chemical",
     };
     function trRandomSampleValue(itemId, k) {
       const m = trRandomState.samples[itemId] || {};
@@ -9560,20 +10204,26 @@
     }
     function trStructureDmValue(sampleNo) { return trRandomSampleValue("structure", sampleNo); }
     function trPhysical1DmFromRandom(rowId, sampleNo) {
-      const rnd = TR_PHYSICAL1_RANDOM_MAP[trPhysical1DmGroupKey(rowId)];
+      const groupId = trPhysical1DmGroupKey(rowId);
+      let rnd = TR_PHYSICAL1_RANDOM_MAP[groupId];
+      if (isFRCNCOMaterial()) {
+        if (groupId === "dielectric90") rnd = "dielectric";
+        else if (rowId === "environmentCold" || rowId === "environmentOil" || rowId.startsWith("environment")) rnd = "extrusion";
+      }
       if (!rnd) return "";
-      // 화학분석 항목(인장강도및신율·이온성불순물·외피특성)은 시료 전체를 "7, 17" 형태로 합쳐 표시
-      if (TR_DM_COMBINE_ITEMS.has(rnd)) return trRandomAllSamples(rnd);
+      // 화학분석 항목은 시료 전체를 "7, 17" 형태로 합쳐 표시
+      if (!isFRCNCOMaterial() && TR_DM_COMBINE_ITEMS.has(rnd)) return trRandomAllSamples(rnd);
       return trRandomSampleValue(rnd, sampleNo);
     }
     // 전기특성: 랜덤발취 시료(=드럼 No.)와 일치하는 행의 해당 시험 입력칸을 반짝이게
-    const TR_ELEC_RANDOM_GLOW = { insulationR: "F", conductorR: "H", capacitance: "I", pd: "J", dielectric: "K" };
+    const TR_ELEC_RANDOM_GLOW = { insulationR: "F", conductorR: "H", capacitance: "I", pd: "J", dielectric: "K", impulse: "L" };
     const TR_ELEC_RANDOM_NAMES = {
       insulationR: "절연저항",
       conductorR: "도체저항",
       capacitance: "정전용량",
       pd: "부분방전",
       dielectric: "유전정접",
+      impulse: "충격내전압",
     };
     function trElectricalRandomItemForCol(col) {
       return Object.keys(TR_ELEC_RANDOM_GLOW).find(itemId => TR_ELEC_RANDOM_GLOW[itemId] === col) || "";
@@ -9670,6 +10320,10 @@
       // 계약저항 입력칸: 비어 있으면 반짝임
       const contractInput = container.querySelector("[data-tr-elec-contract]");
       if (contractInput) contractInput.classList.toggle("tr-elec-prompt", String(contractInput.value || "").trim() === "");
+      container.querySelectorAll("[data-tr-elec-voltage-custom], [data-tr-elec-impulse-custom]").forEach(input => {
+        const required = !input.hidden && !input.disabled;
+        input.classList.toggle("tr-need-input", required && String(input.value || "").trim() === "");
+      });
     }
 
     // 빈 입력칸 깜빡임(공용) — 컨테이너에 한 번만 위임 리스너 바인딩
@@ -9701,6 +10355,11 @@
       c.querySelectorAll('[data-tr-phys1-key]').forEach(ctrl => {
         if (ctrl.disabled || ctrl.readOnly || ctrl.hidden || ctrl.offsetParent === null) { ctrl.classList.remove("tr-need-input"); return; }
         ctrl.classList.toggle("tr-need-input", String(ctrl.value || "").trim() === "");
+      });
+      c.querySelectorAll('[data-tr-phys1-result-select], [data-tr-phys1-agency-number-mode]').forEach(select => {
+        if (select.value !== "공인기관 시험의뢰") return;
+        const rowId = select.dataset.trPhys1ResultSelect || select.dataset.trPhys1AgencyNumberMode || "";
+        select.classList.toggle("tr-need-input", !trPhysicalAgencyText(rowId));
       });
     }
     function trUpdatePhysical2Glow() {
@@ -9781,7 +10440,7 @@
         } else {
           const count = inf.count || 0;
           if (inf.status === "manual") {
-            qtyCell = forPrint ? (count || "") : `<input class="r-qty" type="number" min="0" step="1" data-r-item="${trAttr(item.id)}" value="${txt(trRandomState.qty[item.id] || "")}" />`;
+            qtyCell = forPrint ? (count || "") : `<input class="r-qty" type="number" min="1" step="1" data-r-item="${trAttr(item.id)}" value="${txt(trRandomState.qty[item.id] || "")}" />`;
           } else {
             qtyCell = String(count);
           }
@@ -9820,57 +10479,98 @@
       setupTRRandomEvents();
     }
 
+    function trFRManualQtyHasExcessData(itemId, count) {
+      const samples = trRandomState.samples[itemId] || {};
+      if (Object.entries(samples).some(([key, value]) => Number(key) > count && String(value ?? "").trim() !== "")) return true;
+      const rowIds = new Set(Object.entries(FR_PHYSICAL1_MANUAL_RANDOM_MAP)
+        .filter(([, randomItemId]) => randomItemId === itemId)
+        .map(([rowId]) => rowId));
+      return Object.entries(trPhysical1Values).some(([key, value]) => {
+        const match = key.match(/^([^#]+)#(\d+):/);
+        return !!match && rowIds.has(match[1]) && Number(match[2]) > count && String(value ?? "").trim() !== "";
+      });
+    }
+
     function setupTRRandomEvents() {
       const container = el.trRandomContainer;
       if (!container) return;
-      container.querySelector("[data-r-start]")?.addEventListener("input", e => { trRandomState.start = e.target.value; });
-      container.querySelector("[data-r-end]")?.addEventListener("input", e => { trRandomState.end = e.target.value; });
+      container.querySelector("[data-r-start]")?.addEventListener("input", e => {
+        trRandomState.start = e.target.value;
+        trUpdateRandomValidationGlow();
+      });
+      container.querySelector("[data-r-end]")?.addEventListener("input", e => {
+        trRandomState.end = e.target.value;
+        trUpdateRandomValidationGlow();
+      });
       container.querySelectorAll(".r-qty").forEach(inp => {
-        inp.addEventListener("input", e => { trRandomState.qty[e.target.dataset.rItem] = e.target.value; });
-        inp.addEventListener("change", e => { trRandomState.qty[e.target.dataset.rItem] = e.target.value; renderTRRandom(); });
+        inp.dataset.prevQty = String(trRandomState.qty[inp.dataset.rItem] ?? "");
+        inp.addEventListener("input", e => {
+          trRandomState.qty[e.target.dataset.rItem] = e.target.value;
+          trUpdateRandomValidationGlow();
+        });
+        inp.addEventListener("change", e => {
+          const itemId = e.target.dataset.rItem;
+          if (!isFRCNCOMaterial() || (itemId !== "chemical" && itemId !== "extrusion")) {
+            trRandomState.qty[itemId] = e.target.value;
+            renderTRRandom();
+            return;
+          }
+          const raw = String(e.target.value || "").trim();
+          const count = Number(raw);
+          if (!/^\d+$/.test(raw) || !Number.isSafeInteger(count) || count < 1) {
+            alert("시료수량은 1 이상의 정수로 입력해 주세요.");
+            trUpdateRandomValidationGlow();
+            e.target.focus();
+            return;
+          }
+          if (trFRManualQtyHasExcessData(itemId, count)
+            && !confirm("시료수량을 줄이면 초과하는 랜덤발취 및 물리적특성 입력값이 삭제됩니다. 계속할까요?")) {
+            trRandomState.qty[itemId] = e.target.dataset.prevQty || "";
+            e.target.value = trRandomState.qty[itemId];
+            trUpdateRandomValidationGlow();
+            return;
+          }
+          trRandomState.qty[itemId] = String(count);
+          trPruneFRSamplingData();
+          renderTRRandom();
+        });
       });
       container.querySelectorAll(".r-sample").forEach(inp => {
-        inp.dataset.prev = inp.value || "";
         inp.addEventListener("input", e => {
           const id = e.target.dataset.rItem; const k = e.target.dataset.rK;
           trRandomState.samples[id] = trRandomState.samples[id] || {};
           trRandomState.samples[id][k] = e.target.value;
+          trUpdateRandomValidationGlow();
           // 전기특성 표가 떠 있으면 즉시 반짝임 갱신 (그 외 단계는 진입 시 자동 반영)
           trUpdateElectricalRandomGlow();
         });
-        // 시작번호~끝번호 범위를 벗어난 번호는 입력 불가 (입력 완료 시 검사)
+        // 시작번호~끝번호 범위를 벗어난 값은 보존하되 오류를 표시하고 완료/출력을 차단한다.
         inp.addEventListener("change", e => {
           const id = e.target.dataset.rItem; const k = e.target.dataset.rK;
           const raw = String(e.target.value).trim();
-          const start = Number(String(trRandomState.start).trim());
-          const end = Number(String(trRandomState.end).trim());
-          if (raw !== "" && Number.isFinite(start) && Number.isFinite(end)) {
-            const num = Number(raw);
-            const lo = Math.min(start, end), hi = Math.max(start, end);
-            if (!Number.isInteger(num) || num < lo || num > hi) {
-              alert(`제조번호 범위(${lo} ~ ${hi}) 안의 번호만 입력할 수 있습니다.`);
-              e.target.value = e.target.dataset.prev || "";
-              trRandomState.samples[id] = trRandomState.samples[id] || {};
-              trRandomState.samples[id][k] = e.target.value;
-              trUpdateElectricalRandomGlow();
-              return;
-            }
+          const message = trRandomSampleValidationMessage(raw);
+          if (raw && message) {
+            alert(message);
+            e.target.focus();
           }
-          e.target.dataset.prev = e.target.value;
+          trRandomState.samples[id] = trRandomState.samples[id] || {};
+          trRandomState.samples[id][k] = e.target.value;
+          trUpdateRandomValidationGlow();
           trUpdateElectricalRandomGlow();
-          trClearInvalidElectricalRandomSampleInputs({ alertUser: true, itemId: id });
+          if (!message) trClearInvalidElectricalRandomSampleInputs({ alertUser: true, itemId: id });
         });
       });
+      trUpdateRandomValidationGlow();
     }
 
     function printTRRandom() {
-      const start = String(trRandomState.start || "").trim();
-      const end = String(trRandomState.end || "").trim();
-      if (!start || !end) {
-        alert("제조번호의 시작번호와 끝번호를 입력해 주세요.\n(시작번호·끝번호 누락 시 인쇄할 수 없습니다.)");
+      const errors = trRandomValidationErrors({ includeMissingSamples: true });
+      if (errors.length) {
+        alert("랜덤발취 내용을 확인해 주세요.\n\n- " + errors.slice(0, 20).join("\n- ") + (errors.length > 20 ? `\n... 외 ${errors.length - 20}건` : ""));
         goTRStep("trRandom");
         setTimeout(() => {
-          const target = el.trRandomContainer?.querySelector(!start ? "[data-r-start]" : "[data-r-end]");
+          trUpdateRandomValidationGlow();
+          const target = el.trRandomContainer?.querySelector(".tr-need-input");
           target?.focus();
         }, 0);
         return;
@@ -10082,17 +10782,17 @@
       }
       return NaN;
     }
-    function trReportConductorSpec(spec) {
+    function trReportConductorSpec(spec, materialName = activeTRMaterial) {
       // 도체저항 기준 문자열에서 규격저항 숫자만 추출 (단위 기호 Ω 코드포인트 혼용 문제 회피)
-      const c = TR_ELECTRICAL_CRITERIA[spec]?.conductor || "";
+      const c = getTRElectricalCriteria(spec, materialName)?.conductor || "";
       const m = c.match(/(\d+(?:\.\d+)?)/);
       return m ? m[1] : "";
     }
-    function trReportVoltageResult(spec) {
+    function trReportJudgementResult(spec, col) {
       const store = trElectricalValues[spec] || {};
       let any = false, bad = false;
       Object.keys(store).forEach(k => {
-        if (k.split(":")[1] === "E") {
+        if (k.split(":")[1] === col) {
           const v = String(store[k] || "").trim();
           if (v) { any = true; if (v === "불량") bad = true; }
         }
@@ -10101,13 +10801,15 @@
       if (any) return { text: "만 족", bad: false };
       return { text: "-", bad: false };
     }
+    function trReportVoltageResult(spec) { return trReportJudgementResult(spec, "E"); }
+    function trReportImpulseResult(spec) { return trReportJudgementResult(spec, "L"); }
 
     // ----- 물리1 결과 헬퍼 -----
     function trReportP1Result(id, sampleNo = 1) {
       const base = `${id}#${sampleNo}`;
       const r = trPhysical1Value(`${base}:result`);
       if (r === "공인기관 시험의뢰") { const a = trPhysicalAgencyText(base); if (a) return a; }
-      if (r === "기타") { const c = trPhysical1Value(`${base}:custom`); if (c) return c; }
+      if (r === "데이터 입력" || r === "기타") { const c = trPhysical1Value(`${base}:custom`); if (c) return c; }
       return r;
     }
     function trReportP1Peel(sampleNo = 1) {
@@ -10123,12 +10825,16 @@
     function trReportP1Dm(id, sampleNo = 1) {
       return trPhysical1DmFromRandom(id, sampleNo);
     }
-    function trReportP1Row(id) {
-      return TR_PHYSICAL1_ROWS.find(row => row.id === id);
+    function trReportP1Row(id, materialName = activeTRMaterial) {
+      return getTRPhysical1Rows(materialName).find(row => row.id === id);
     }
-    function trReportP1Info(id) {
-      const row = trReportP1Row(id);
-      return row ? trPhysicalSampleInfo(row.pattern) : { status: "na", count: 0 };
+    function trReportP1Info(id, materialName = activeTRMaterial) {
+      const row = trReportP1Row(id, materialName);
+      return row ? trPhysical1RowSampleInfo(row, { askLowDrum: false, materialName }) : { status: "na", count: 0 };
+    }
+    function trReportP1Applicable(id, materialName = activeTRMaterial) {
+      const info = trReportP1Info(id, materialName);
+      return info.status === "ok" || info.status === "manual";
     }
     function trReportP1ResultBad(row, sampleNo) {
       if (!row) return false;
@@ -10199,11 +10905,11 @@
     // ----- 판정(합격/불합격) -----
     function trReportStructureFail() {
       if (trStructureAppearance === "불량") return true;
-      const s = TR_STRUCTURE_CRITERIA[el.trItemDetail?.value || ""];
+      const s = getTRStructureCriteria();
       if (!s) return false;
       const samples = trReportStructureSampleNos();
       for (const sampleNo of samples) {
-        for (const row of TR_STRUCTURE_TABLE_ROWS) {
+        for (const row of getTRStructureTableRows()) {
           const bounds = trStructureBounds(s, row.id);
           if (!bounds) continue;
           for (const v of trNumbers(row.id, sampleNo)) {
@@ -10231,15 +10937,15 @@
     }
     function trReportElectricalFail() {
       const spec = el.trItemDetail?.value || "";
-      const limits = TR_ELECTRICAL_LIMITS[spec];
+      const limits = getTRElectricalLimits(spec);
       const sampleInfoMap = getTRElectricalSampleInfoMap();
-      const contract = Number(trElectricalContractValues[spec]);
-      const hasContract = Number.isFinite(contract);
-      if (trReportElecColValues(spec, "H", sampleInfoMap).some(v => hasContract && v > contract)) return true;
+      const conductorLimit = trElectricalConductorLimit(spec);
+      if (trReportElecColValues(spec, "H", sampleInfoMap).some(v => conductorLimit != null && v > conductorLimit)) return true;
       if (trReportElecIsTarget(sampleInfoMap.I) && limits && trReportElecColValues(spec, "I", sampleInfoMap).some(v => v > limits.capacitanceMax)) return true;
       if (trReportElecIsTarget(sampleInfoMap.J) && trReportElecColValues(spec, "J", sampleInfoMap).some(v => v > TR_ELECTRICAL_PARTIAL_DISCHARGE_MAX)) return true;
       if (trReportElecIsTarget(sampleInfoMap.K) && trReportElecColValues(spec, "K", sampleInfoMap).some(v => v > TR_ELECTRICAL_DIELECTRIC_MAX)) return true;
       if (trReportVoltageResult(spec).bad) return true;
+      if (isFRCNCOMaterial() && trReportImpulseResult(spec).bad) return true;
       if (trReportElecIsTarget(sampleInfoMap.F) && limits) {
         const cnt = trReportElecRowCount(spec);
         for (let r = 1; r <= cnt; r++) {
@@ -10251,8 +10957,8 @@
     }
     function trReportPhysicalFail() {
       // 물리1 드롭다운 불량
-      for (const row of TR_PHYSICAL1_ROWS) {
-        const info = trPhysicalSampleInfo(row.pattern);
+      for (const row of getTRPhysical1Rows()) {
+        const info = trPhysical1RowSampleInfo(row, { askLowDrum: false });
         if (info.status !== "ok") continue;
         for (let s = 1; s <= info.count; s++) {
           const sampleRowId = `${row.id}#${s}`;
@@ -10300,16 +11006,28 @@
     }
 
     // ===== 시트 1) 종합 =====
-    function trReportSparkVoltage(spec) {
+    function trReportSparkVoltage(spec, materialName = activeTRMaterial) {
+      if (isFRCNCOMaterial(materialName)) return "10kV";
       return ["60mm2", "200mm2", "95mm2", "240mm2"].includes(spec) ? "4.5kV" : "7.0kV";
     }
 
     function trReportSummarySheet(b) {
       const spec = b.spec;
-      const limits = TR_ELECTRICAL_LIMITS[spec] || {};
-      const condSpec = trReportConductorSpec(spec);
-      const contract = trElectricalContractValues[spec] || "";
+      const limits = getTRElectricalLimits(spec, b.itemName) || {};
+      const condSpec = trReportConductorSpec(spec, b.itemName);
+      const showContract = trElectricalContractApplicable(spec, b.itemName);
+      const isFRSummary = isFRCNCOMaterial(b.itemName);
+      const contract = trElectricalContractValue(spec, b.itemName);
+      const conductorLimit = trElectricalConductorLimit(spec, b.itemName, contract);
       const sampleInfoMap = getTRElectricalSampleInfoMap();
+      const showImpulse = isFRSummary && !!sampleInfoMap.L && trReportElecIsTarget(sampleInfoMap.L);
+      const showConductor = !isFRSummary || trReportElecIsTarget(sampleInfoMap.H);
+      const showDielectric100 = !isFRSummary || trReportElecIsTarget(sampleInfoMap.K);
+      const showCapacitance = !isFRSummary || trReportElecIsTarget(sampleInfoMap.I);
+      const showPartialDischarge = !isFRSummary || trReportElecIsTarget(sampleInfoMap.J);
+      const showInsulationResistance = !isFRSummary || trReportElecIsTarget(sampleInfoMap.F);
+      const activeP1Ids = ids => isFRSummary ? ids.filter(id => trReportP1Applicable(id, b.itemName)) : ids;
+      const showP1Group = ids => !isFRSummary || activeP1Ids(ids).length > 0;
       const hVals = trReportElecColValues(spec, "H", sampleInfoMap);
       const iVals = trReportElecColValues(spec, "I", sampleInfoMap);
       const jVals = trReportElecColValues(spec, "J", sampleInfoMap);
@@ -10324,27 +11042,34 @@
       const pdMinV = jVals.length ? Math.min(...jVals) : null;
       const pdMaxV = jVals.length ? Math.max(...jVals) : null;
       const dielMaxV = kVals.length ? Math.max(...kVals) : null;
+      const summaryNumber = (value, frDigits, legacyDigits = frDigits) => trReportNumberString(value, {
+        digits: isFRSummary ? frDigits : legacyDigits,
+        fixed: isFRSummary,
+      });
       const condRes = condMaxV == null
         ? "-"
         : hVals.length > 1
-          ? `${trReportNumberString(condMinV, { digits: 5 })}~${trReportNumberString(condMaxV, { digits: 5 })}`
-          : trReportNumberString(condMaxV, { digits: 5 });
-      const capRes = trReportElecSummaryText(sampleInfoMap.I, capMaxV != null ? trReportNumberString(capMaxV, { digits: 3 }) : "-");
+          ? `${summaryNumber(condMinV, 4, 5)}~${summaryNumber(condMaxV, 4, 5)}`
+          : summaryNumber(condMaxV, 4, 5);
+      const capRes = trReportElecSummaryText(sampleInfoMap.I, capMaxV != null ? summaryNumber(capMaxV, 3) : "-");
       const pdRes = trReportElecSummaryText(sampleInfoMap.J, pdMaxV == null
         ? "-"
         : jVals.length > 1
-          ? `${trReportNumberString(pdMinV, { digits: 2 })}~${trReportNumberString(pdMaxV, { digits: 2 })}`
-          : trReportNumberString(pdMaxV, { digits: 2 }));
+          ? `${summaryNumber(pdMinV, 1, 2)}~${summaryNumber(pdMaxV, 1, 2)}`
+          : summaryNumber(pdMaxV, 1, 2));
       const insMinV = gVals.length ? Math.min(...gVals) : null;
       const insRes = trReportElecSummaryText(sampleInfoMap.F, insMinV != null ? trCommafy(String(Math.round(insMinV))) : "-");
-      // 유전정접 100℃ = Step3 전기특성 유전정접(K) 대표값
-      const diel100 = trReportElecSummaryText(sampleInfoMap.K, dielMaxV != null ? trReportNumberString(dielMaxV, { digits: 3 }) : "-");
-      // 유전정접 온도특성 = 물리1 90/130/상온 데이터 최소~최대
+      // 일반 유전정접 = Step3 전기특성 유전정접(K) 대표값
+      const diel100 = trReportElecSummaryText(sampleInfoMap.K, dielMaxV != null ? summaryNumber(dielMaxV, 2, 3) : "-");
+      // 유전정접 온도특성 = FR은 물리1 상온/60/90, 기존 품목은 90/130/상온 데이터 최소~최대
       const dielVals = [];
-      const dielTempInfo = trPhysicalSampleInfo("A");
+      const dielTempInfo = trReportP1Info("dielectric90", b.itemName);
+      const dielectricTempRowIds = isFRSummary
+        ? ["dielectricRoom", "dielectric60", "dielectric90"]
+        : ["dielectric90", "dielectric130", "dielectricRoom"];
       {
         const dn = dielTempInfo.status === "ok" ? dielTempInfo.count : 0;
-        ["dielectric90", "dielectric130", "dielectricRoom"].forEach(id => {
+        dielectricTempRowIds.forEach(id => {
           for (let s = 1; s <= dn; s++) {
             if (trPhysicalAgencyNumberMode(`${id}#${s}`) !== "수치 입력") continue;
             const raw = trPhysical1Value(`${id}#${s}:value`);
@@ -10357,13 +11082,24 @@
         ? "해당사항 없음"
         : dielTempInfo.status === "omit"
           ? "생략"
-          : dielVals.length ? `${trReportNumberString(Math.min(...dielVals), { digits: 3 })} ~ ${trReportNumberString(Math.max(...dielVals), { digits: 3 })}` : "-";
-      const tempCharBad = dielVals.some(value => value > 0.5);
+          : dielVals.length ? `${summaryNumber(Math.min(...dielVals), 2, 3)} ~ ${summaryNumber(Math.max(...dielVals), 2, 3)}` : "-";
+      const tempCharBad = dielVals.some(value => value > (isFRSummary ? 0.4 : 0.5));
+      const showDielectricTemp = showP1Group(dielectricTempRowIds);
+      const badIf = cond => cond ? ' class="tr-rpt-bad"' : "";
       const voltage = trReportVoltageResult(spec);
       const vText = voltage.bad ? "불 량" : (voltage.text === "-" ? "-" : "양 호");
+      const impulse = showImpulse ? trReportImpulseResult(spec) : null;
+      const impulseText = impulse ? (impulse.bad ? "불 량" : (impulse.text === "-" ? "-" : "양 호")) : "";
+      const impulseRowHtml = impulse
+        ? `<tr><td>충격내전압</td><td>절연체</td><td>1.2×50㎲/정․부극성 각 10회</td><td${badIf(impulse.bad)}>${impulseText}</td></tr>`
+        : "";
 
       // 체적저항율: 전체 시료 중 가장 큰 값(상한 기준의 최악값)
-      const trVolFmt = v => !Number.isFinite(v) ? "-" : (v >= 1 ? trCommafy(String(Math.round(v))) : trReportNumberString(v, { digits: 1 }));
+      const trVolFmt = v => !Number.isFinite(v)
+        ? "-"
+        : isFRSummary
+          ? trCommafy(String(Math.round(v)))
+          : (v >= 1 ? trCommafy(String(Math.round(v))) : trReportNumberString(v, { digits: 1 }));
       const volInfo = trPhysicalSampleInfo("B");
       const volEvaluations = volInfo.status === "ok"
         ? Array.from({ length: volInfo.count }, (_, index) => calcTRPhysical2Evaluation(index + 1))
@@ -10379,7 +11115,7 @@
       const outerVol = volumeStatusText || (trVolumeRemoteTest ? "양 호" : trVolFmt(outerVolMax));
 
       // 박리력: 전체 시료의 최솟값~최댓값을 표시
-      const peelInfo = trReportP1Info("outerSemiPeel");
+      const peelInfo = trReportP1Info("outerSemiPeel", b.itemName);
       const peelMins = [], peelMaxs = [];
       if (peelInfo.status === "ok") {
         for (let sampleNo = 1; sampleNo <= peelInfo.count; sampleNo++) {
@@ -10396,19 +11132,27 @@
         ? "해당사항 없음"
         : peelInfo.status === "omit"
           ? "생략"
-          : peelMin != null || peelMax != null ? `${peelMin != null ? trReportNumberString(peelMin, { digits: 2 }) : "-"} ~ ${peelMax != null ? trReportNumberString(peelMax, { digits: 2 }) : "-"}` : "-";
+          : peelMin != null || peelMax != null ? `${peelMin != null ? summaryNumber(peelMin, 1, 2) : "-"} ~ ${peelMax != null ? summaryNumber(peelMax, 1, 2) : "-"}` : "-";
       const peelBad = (peelMin != null && peelMin < 4) || (peelMax != null && peelMax > 45);
 
       const appearBad = trReportStructureFail();
       const structureDefaultGood = trStructureInputState().status === "none";
       const appearRes = appearBad ? "불 량" : (trStructureAppearance === "양호" || structureDefaultGood ? "양 호" : "-");
-      const neutralWater = trReportP1CombinedStatus(["neutralWater"], "별 첨");
-      const conductorWater = trReportP1CombinedStatus(["conductorWater"], "별 첨");
-      const compound = trReportP1CombinedStatus(["compoundDrop"], "해당사항 없음");
-      const insulSemi = trReportP1CombinedStatus(["insulationSemiInspection"], "별 첨");
+      const neutralWaterIds = activeP1Ids(["neutralWater"]);
+      const conductorWaterIds = activeP1Ids(["conductorWater"]);
+      const insulSemiIds = activeP1Ids(["insulationSemiInspection"]);
+      const neutralWater = trReportP1CombinedStatus(neutralWaterIds, "별 첨");
+      const conductorWater = trReportP1CombinedStatus(conductorWaterIds, "별 첨");
+      const insulSemi = trReportP1CombinedStatus(insulSemiIds, "별 첨");
+      const showVolume = showP1Group(["semiVolumeInner", "semiVolumeOuter"]);
+      const showPeel = showP1Group(["outerSemiPeel"]);
+      const showNeutralWater = !isFRSummary || neutralWaterIds.length > 0;
+      const showConductorWater = !isFRSummary || conductorWaterIds.length > 0;
+      const showInsulSemi = !isFRSummary || insulSemiIds.length > 0;
 
-      // 절연압출공정 적합성: 전체 시료 중 가장 낮은 파괴지점이 최악값
-      const acInfo = trReportP1Info("acBreakdown");
+      // 교류파괴가 있는 기존 품목: 전체 시료 중 가장 낮은 파괴지점이 최악값
+      const showAcBreakdown = !!trReportP1Row("acBreakdown", b.itemName);
+      const acInfo = trReportP1Info("acBreakdown", b.itemName);
       const acValues = [];
       const acAgencies = [];
       if (acInfo.status === "ok") {
@@ -10431,9 +11175,69 @@
         : acInfo.status === "omit"
           ? "생략"
           : acWorst != null ? `파괴지점 ${trReportNumberString(acWorst, { digits: 2 })} kV` : (acAgencies[0] || "별 첨");
-      const analysis = trReportP1CombinedStatus(["tensileElongation", "ionicImpurity", "sheathProperty"], "별 첨");
-      const badIf = cond => cond ? ' class="tr-rpt-bad"' : "";
-
+      const analysisIds = b.itemName === "FR CNCO-W"
+        ? ["tensileElongation", "ionicImpurity", "crosslinkInner", "crosslinkFiller", "crosslinkOuter"]
+        : ["tensileElongation", "ionicImpurity", "sheathProperty"];
+      const activeAnalysisIds = activeP1Ids(analysisIds);
+      const analysis = trReportP1CombinedStatus(activeAnalysisIds, "별 첨");
+      const showAnalysis = !isFRSummary || activeAnalysisIds.length > 0;
+      const environmentColdIds = activeP1Ids(["environmentCold", "environmentOil"]);
+      const environmentAnnualIds = activeP1Ids([
+        "environmentFlameSheath", "environmentOxygenIndex", "environmentCorrosivity", "environmentToxicity", "environmentSmokeDensity",
+      ]);
+      const environmentIds = environmentAnnualIds.length
+        ? [...environmentColdIds, ...environmentAnnualIds]
+        : environmentColdIds;
+      const environment = trReportP1CombinedStatus(environmentIds, "별 첨");
+      const environmentTitle = environmentAnnualIds.length ? "내환경성시험" : "내한(유) 시험";
+      const conductorBad = condMaxV != null && conductorLimit != null && condMaxV > conductorLimit;
+      const dielectricRegularLabel = isFRSummary ? "13.2kV" : "100℃";
+      const conductorRowsHtml = !showConductor ? "" : showContract
+          ? `<tr><td rowspan="2">도체저항 20℃ (Ω/㎞)</td><td>규격저항</td><td>${trReportNumberText(condSpec, "-")}</td><td rowspan="2"${badIf(conductorBad)}>${condRes}</td></tr>
+                <tr><td>계약저항</td><td>${trReportNumberText(contract, "-")}</td></tr>`
+          : `<tr><td>도체저항 20℃ (Ω/㎞)</td><td colspan="2">${trReportNumberText(condSpec, "-")} 이하</td><td${badIf(conductorBad)}>${condRes}</td></tr>`;
+      const dielectricRowsHtml = showDielectric100 && showDielectricTemp
+        ? `<tr><td rowspan="2">유전정접 (％)</td><td>${dielectricRegularLabel}</td><td>0.4% 이하</td><td${badIf(dielMaxV != null && dielMaxV > TR_ELECTRICAL_DIELECTRIC_MAX)}>${diel100}</td></tr>
+           <tr><td>온도특성</td><td>${isFRSummary ? "0.4% 이하" : "0.5% 이하"}</td><td${badIf(tempCharBad)}>${tempChar}</td></tr>`
+        : showDielectric100
+          ? `<tr><td>유전정접 (％)</td><td>${dielectricRegularLabel}</td><td>0.4% 이하</td><td${badIf(dielMaxV != null && dielMaxV > TR_ELECTRICAL_DIELECTRIC_MAX)}>${diel100}</td></tr>`
+          : showDielectricTemp
+            ? `<tr><td>유전정접 (％)</td><td>온도특성</td><td>${isFRSummary ? "0.4% 이하" : "0.5% 이하"}</td><td${badIf(tempCharBad)}>${tempChar}</td></tr>`
+            : "";
+      const capacitanceRowHtml = showCapacitance
+        ? `<tr><td>정 전 용 량 (㎌/㎞)</td><td colspan="2">${trReportNumberText(limits.capacitanceMax, "-")} 이하</td><td${badIf(limits.capacitanceMax != null && capMaxV != null && capMaxV > limits.capacitanceMax)}>${capRes}</td></tr>`
+        : "";
+      const partialDischargeRowHtml = showPartialDischarge
+        ? `<tr><td>부분방전 시험</td><td colspan="2">10 pC 이하</td><td${badIf(pdMaxV != null && pdMaxV > TR_ELECTRICAL_PARTIAL_DISCHARGE_MAX)}>${pdRes}</td></tr>`
+        : "";
+      const insulationResistanceRowHtml = showInsulationResistance
+        ? `<tr><td>절 연 저 항 (㏁·㎞)</td><td colspan="2">${trReportNumberText(limits.insulationMin, "-")} 이상</td><td${badIf(limits.insulationMin != null && insMinV != null && insMinV < limits.insulationMin)}>${insRes}</td></tr>`
+        : "";
+      const volumeRowsHtml = showVolume
+        ? `<tr><td rowspan="2">반도전층 체적저항율 (Ω·m)</td><td>내 부</td><td>1,000 이하</td><td${badIf(innerVolBad)}>${innerVol}</td></tr>
+           <tr><td>외 부</td><td>500 이하</td><td${badIf(outerVolBad)}>${outerVol}</td></tr>`
+        : "";
+      const peelRowHtml = showPeel
+        ? `<tr><td>외부반도전층 박리력 (N)</td><td colspan="2">4 ~ 45</td><td${badIf(peelBad)}>${peel}</td></tr>`
+        : "";
+      const neutralWaterRowHtml = showNeutralWater
+        ? `<tr><td>중성선수밀 시험</td><td colspan="2">케이블 양단에 누수가 없을 것</td><td${badIf(neutralWater.bad)}>${trReportText(neutralWater.text)}</td></tr>`
+        : "";
+      const conductorWaterRowHtml = showConductorWater
+        ? `<tr><td>도체수밀 시험</td><td colspan="2">타단으로 누수가 없을 것</td><td${badIf(conductorWater.bad)}>${trReportText(conductorWater.text)}</td></tr>`
+        : "";
+      const insulSemiRowHtml = showInsulSemi
+        ? `<tr><td>절연층 및 반도전층 검사</td><td colspan="2">구매규격서</td><td${badIf(insulSemi.bad)}>${trReportText(insulSemi.text)}</td></tr>`
+        : "";
+      const analysisRowHtml = showAnalysis
+        ? `<tr><td>${isFRSummary ? "화학분석시험(가교도 등)" : "분  석  시  험"}</td><td colspan="2">구매규격서</td><td${badIf(analysis.bad)}>${trReportText(analysis.text)}</td></tr>`
+        : "";
+      const environmentRowHtml = isFRSummary && environmentIds.length
+        ? `<tr><td>${environmentTitle}</td><td colspan="2">구매규격서</td><td${badIf(environment.bad)}>${trReportText(environment.text)}</td></tr>`
+        : "";
+      const acBreakdownRowHtml = showAcBreakdown
+        ? `<tr><td>절연압출공정적합성(교류파괴)</td><td colspan="2">구매규격서</td><td${badIf(extrusionBad)}>${trReportText(extrusion)}</td></tr>`
+        : "";
       return `
         <section class="tr-report-page">
           <div class="tr-rpt-title">시 험 성 적 서</div>
@@ -10443,24 +11247,22 @@
             <thead><tr><th>구        분</th><th colspan="2">기        준</th><th>결        과</th></tr></thead>
             <tbody>
               <tr><td>겉모양 및 구조</td><td colspan="2">구매규격서</td><td${badIf(appearBad)}>${appearRes}</td></tr>
-              <tr><td rowspan="2">도체저항 20℃ (Ω/㎞)</td><td>규격저항</td><td>${trReportNumberText(condSpec, "-")}</td><td rowspan="2"${badIf(condMaxV != null && contract !== "" && condMaxV > Number(contract))}>${condRes}</td></tr>
-              <tr><td>계약저항</td><td>${trReportNumberText(contract, "-")}</td></tr>
-              <tr><td rowspan="2">유전정접 (％)</td><td>100℃</td><td>0.4% 이하</td><td${badIf(dielMaxV != null && dielMaxV > TR_ELECTRICAL_DIELECTRIC_MAX)}>${diel100}</td></tr>
-              <tr><td>온도특성</td><td>0.5% 이하</td><td${badIf(tempCharBad)}>${tempChar}</td></tr>
-              <tr><td>정 전 용 량 (㎌/㎞)</td><td colspan="2">${trReportNumberText(limits.capacitanceMax, "-")} 이하</td><td${badIf(limits.capacitanceMax != null && capMaxV != null && capMaxV > limits.capacitanceMax)}>${capRes}</td></tr>
-              <tr><td>스파크 내전압</td><td colspan="2">${trReportSparkVoltage(spec)} / 0.15초</td><td>별  첨</td></tr>
+              ${conductorRowsHtml}
+              ${dielectricRowsHtml}
+              ${capacitanceRowHtml}
+              <tr><td>스파크 내전압</td><td colspan="2">${trReportSparkVoltage(spec, b.itemName)} / 0.15초 이상</td><td>별  첨</td></tr>
               <tr><td>교류내전압</td><td>절연체</td><td>46kV / 5분</td><td${badIf(voltage.bad)}>${vText}</td></tr>
-              <tr><td>부분방전 시험</td><td colspan="2">10 pC 이하</td><td${badIf(pdMaxV != null && pdMaxV > TR_ELECTRICAL_PARTIAL_DISCHARGE_MAX)}>${pdRes}</td></tr>
-              <tr><td>절 연 저 항 (㏁·㎞)</td><td colspan="2">${trReportNumberText(limits.insulationMin, "-")} 이상</td><td${badIf(limits.insulationMin != null && insMinV != null && insMinV < limits.insulationMin)}>${insRes}</td></tr>
-              <tr><td rowspan="2">반도전층 체적저항율 (Ω·m)</td><td>내 부</td><td>1,000 이하</td><td${badIf(innerVolBad)}>${innerVol}</td></tr>
-              <tr><td>외 부</td><td>500 이하</td><td${badIf(outerVolBad)}>${outerVol}</td></tr>
-              <tr><td>외부반도전층 박리력 (N)</td><td colspan="2">4 ~ 45</td><td${badIf(peelBad)}>${peel}</td></tr>
-              <tr><td>중성선수밀 시험</td><td colspan="2">케이블 양단에 누수가 없을 것</td><td${badIf(neutralWater.bad)}>${trReportText(neutralWater.text)}</td></tr>
-              <tr><td>도체수밀 시험</td><td colspan="2">타단으로 누수가 없을 것</td><td${badIf(conductorWater.bad)}>${trReportText(conductorWater.text)}</td></tr>
-              <tr><td>컴파운드 적하량 시험</td><td colspan="2">적하가 없을 것</td><td${badIf(compound.bad)}>${trReportText(compound.text)}</td></tr>
-              <tr><td>절연층 및 반도전층 검사</td><td colspan="2">구매규격서</td><td${badIf(insulSemi.bad)}>${trReportText(insulSemi.text)}</td></tr>
-              <tr><td>절연압출공정적합성(교류파괴)</td><td colspan="2">구매규격서</td><td${badIf(extrusionBad)}>${trReportText(extrusion)}</td></tr>
-              <tr><td>분  석  시  험</td><td colspan="2">구매규격서</td><td${badIf(analysis.bad)}>${trReportText(analysis.text)}</td></tr>
+              ${impulseRowHtml}
+              ${partialDischargeRowHtml}
+              ${insulationResistanceRowHtml}
+              ${volumeRowsHtml}
+              ${peelRowHtml}
+              ${neutralWaterRowHtml}
+              ${conductorWaterRowHtml}
+              ${insulSemiRowHtml}
+              ${acBreakdownRowHtml}
+              ${analysisRowHtml}
+              ${environmentRowHtml}
               <tr class="tr-sum-result"><td colspan="3">시 험 결 과</td><td>${trReportText(trReportJudgement())}</td></tr>
             </tbody>
           </table>
@@ -10481,7 +11283,7 @@
     }
     function trReportStructurePageHtml(b, slots, pageInfo) {
       const spec = b.spec;
-      const criteria = TR_STRUCTURE_CRITERIA[spec];
+      const criteria = getTRStructureCriteria(spec, b.itemName);
       if (!criteria) return "";
       const structureDefaultGood = trStructureInputState().status === "none";
       // slots: 길이 4 배열, 각 항목은 시료번호 또는 null(빈 칸)
@@ -10494,7 +11296,7 @@
       // 측정 값 셀(기준 초과 시 빨간색)
       const valCell = (raw, rowId, colspan = 1) => {
         const bounds = trStructureBounds(criteria, rowId);
-        const row = TR_STRUCTURE_TABLE_ROWS.find(item => item.id === rowId);
+        const row = getTRStructureTableRows(b.itemName).find(item => item.id === rowId);
         const num = Number(raw);
         let bad = false;
         if (bounds && raw !== "" && Number.isFinite(num)) {
@@ -10510,7 +11312,7 @@
       };
 
       let rowsHtml = "";
-      TR_STRUCTURE_TABLE_ROWS.forEach(row => {
+      getTRStructureTableRows(b.itemName).forEach(row => {
         // Step2와 동일하게 제목의 줄바꿈(\n)을 그대로 유지
         const titleRaw = (typeof row.title === "function" ? row.title(criteria) : row.title);
         const titleHtml = trEsc(titleRaw).replace(/\n/g, "<br>");
@@ -10588,7 +11390,7 @@
 
     function trReportStructureOmitPageHtml(b) {
       const spec = b.spec;
-      const criteria = TR_STRUCTURE_CRITERIA[spec];
+      const criteria = getTRStructureCriteria(spec, b.itemName);
       if (!criteria) return "";
       const sampleCols = Array.from({ length: 12 }, () => '<col style="width:5.5%">').join("");
       const structureDefaultGood = trStructureInputState().status === "none";
@@ -10637,12 +11439,15 @@
     // ===== 시트 3) 전기적특성 =====
     function trReportElectricalSheet(b) {
       const spec = b.spec;
-      const criteria = TR_ELECTRICAL_CRITERIA[spec];
-      const limits = TR_ELECTRICAL_LIMITS[spec] || {};
+      const criteria = getTRElectricalCriteria(spec, b.itemName);
+      const limits = getTRElectricalLimits(spec, b.itemName) || {};
       if (!criteria) {
         return `<section class="tr-report-page"><div class="tr-rpt-sub">전기적 특성시험 DATA</div>${trReportHeaderHtml(b)}<p style="text-align:center;margin-top:20px;">전기특성 입력값이 없습니다.</p></section>`;
       }
-      const contract = trElectricalContractValues[spec] || "";
+      const showContract = trElectricalContractApplicable(spec, b.itemName);
+      const showImpulse = isFRCNCOMaterial(b.itemName);
+      const contract = trElectricalContractValue(spec, b.itemName);
+      const conductorLimit = trElectricalConductorLimit(spec, b.itemName, contract);
       const sampleInfoMap = getTRElectricalSampleInfoMap();
       trPruneTRElectricalState(spec, sampleInfoMap);
       const cnt = trReportElecRowCount(spec);
@@ -10662,9 +11467,11 @@
         const fText = fTarget && String(fRaw).trim() !== "" ? trCommafy(fRaw) : fRaw;
         const eVal = cell(r, "E");
         const eText = eVal === "기타" ? (cell(r, "E_text") || "기타") : eVal;
+        const lVal = showImpulse ? reportCell(r, "L") : "";
+        const lText = lVal === "기타" ? (cell(r, "L_text") || "기타") : lVal;
         const hv = Number(reportCell(r, "H")); const iv = Number(reportCell(r, "I"));
         const jv = Number(reportCell(r, "J")); const kv = Number(reportCell(r, "K"));
-        const badH = trElectricalInputAllowed(sampleInfoMap.H) && Number.isFinite(hv) && contract !== "" && hv > Number(contract);
+        const badH = trElectricalInputAllowed(sampleInfoMap.H) && Number.isFinite(hv) && conductorLimit != null && hv > conductorLimit;
         const badI = trElectricalInputAllowed(sampleInfoMap.I) && Number.isFinite(iv) && limits.capacitanceMax != null && iv > limits.capacitanceMax;
         const badJ = trElectricalInputAllowed(sampleInfoMap.J) && Number.isFinite(jv) && jv > TR_ELECTRICAL_PARTIAL_DISCHARGE_MAX;
         const badK = trElectricalInputAllowed(sampleInfoMap.K) && Number.isFinite(kv) && kv > TR_ELECTRICAL_DIELECTRIC_MAX;
@@ -10675,6 +11482,7 @@
             <td>${trReportNumberText(cell(r, "B"), "")}</td>
             <td>${trReportNumberText(cell(r, "C"), "")}</td>
             <td${eText === "불량" ? ' class="tr-rpt-bad"' : ""}>${trReportText(eText, "")}</td>
+            ${showImpulse ? `<td${lText === "불량" ? ' class="tr-rpt-bad"' : ""}>${trReportText(lText, "")}</td>` : ""}
             <td>${trEsc(fText)}</td>
             <td${b2(badG)}>${trEsc(gText)}</td>
             <td${b2(badH)}>${trReportNumberText(reportCell(r, "H"), "")}</td>
@@ -10683,7 +11491,7 @@
             <td${b2(badK)}>${trReportNumberText(reportCell(r, "K"), "")}</td>
           </tr>`);
       }
-      if (!cnt) rows.push(`<tr><td colspan="10">입력된 데이터가 없습니다.</td></tr>`);
+      if (!cnt) rows.push(`<tr><td colspan="${showImpulse ? 11 : 10}">입력된 데이터가 없습니다.</td></tr>`);
       const rowsPerPage = 40;
       const totalPages = Math.max(1, Math.ceil(rows.length / rowsPerPage));
       return Array.from({ length: totalPages }, (_, pageIndex) => {
@@ -10696,6 +11504,7 @@
           <table class="tr-data-tbl tr-elec-tbl">
             <colgroup>
               <col style="width:7%"><col style="width:9%"><col style="width:6%"><col style="width:9%">
+              ${showImpulse ? '<col style="width:9%">' : ""}
               <col style="width:9%"><col style="width:9%"><col style="width:20%">
               <col style="width:11%"><col style="width:8%"><col style="width:8%">
             </colgroup>
@@ -10705,11 +11514,12 @@
                 <th rowspan="2">조 장<br>(m)</th>
                 <th rowspan="2">여 척<br>(m)</th>
                 <th rowspan="2">내전압<br>(46kV/5분)</th>
+                ${showImpulse ? '<th rowspan="2">충격내전압<br>(절연체)</th>' : ""}
                 <th colspan="2">${trReportMultiline(criteria.insulation)}</th>
-                <th rowspan="2">${trEsc(criteria.conductor.replace(/\n/g, ""))}<br>계약저항(${trReportNumberText(contract, "-")}Ω/km 이하)</th>
+                <th rowspan="2">${isFRCNCOMaterial(b.itemName) ? trReportMultiline(criteria.conductor) : trEsc(criteria.conductor.replace(/\n/g, ""))}${showContract ? `<br>계약저항(${trReportNumberText(contract, "-")}Ω/km 이하)` : ""}</th>
                 <th rowspan="2">${trReportMultiline(criteria.capacitance)}</th>
                 <th rowspan="2">부분방전<br>(10pC<br>이하)</th>
-                <th rowspan="2">유전정접<br>(0.4%<br>이하)</th>
+                <th rowspan="2">유전정접<br>${showImpulse ? "(13.2kV)<br>(0.4% 이하)" : "(0.4%<br>이하)"}</th>
               </tr>
               <tr><th>측정치</th><th>환산치</th></tr>
             </thead>
@@ -10723,7 +11533,7 @@
     function trReportPhysical1Sheet(b) {
       // 연속 동일 시험항목 묶기 (입력 스텝과 동일하게 D/M No. 병합)
       const groups = [];
-      TR_PHYSICAL1_ROWS.forEach(row => {
+      getTRPhysical1Rows(b.itemName).forEach(row => {
         const last = groups[groups.length - 1];
         if (last && last.item === row.item) last.leaves.push(row);
         else groups.push({ item: row.item, leaves: [row] });
@@ -10731,6 +11541,7 @@
       const resultOf = (row, s, info) => {
         const markBad = (html, bad) => bad ? `<span class="tr-rpt-bad">${html}</span>` : html;
         if (info.status === "omit") return "생략";
+        if (info.status === "manual") return "수량 입력 필요";
         if (info.status === "na") return "미해당";
         if (row.type === "calc") {
           const ev = calcTRPhysical2Evaluation(s)[row.calc];
@@ -10764,27 +11575,69 @@
       };
 
       let rowsHtml = "";
+      const frDmLast = b.itemName === "FR CNCO-W";
       groups.forEach(group => {
         const leaves = group.leaves;
         const hasSub = leaves.some(l => l.sub);
-        const info = trPhysicalSampleInfo(leaves[0].pattern);
-        const itemHtml = trEsc(leaves[0].item).replace(/\n/g, "<br>");
+        const entries = leaves.map(row => ({ row, info: trPhysical1RowSampleInfo(row, { askLowDrum: false, materialName: b.itemName }) }));
+        const itemName = trPhysical1GroupDisplayName(group.item, entries, b.itemName);
+        const itemHtml = trEsc(itemName).replace(/\n/g, "<br>");
         const subHtml = leaf => trEsc(leaf.sub || "").replace(/\n/g, "<br>");
-        const critHtml = leaf => trReportMultiline(leaf.criteria);
+        const critHtml = leaf => trPhysical1CriteriaHtml(leaf);
+
+        if (frDmLast && group.item === "내 환경성 시험") {
+          const activeEntries = entries.filter(entry => entry.info.status === "ok");
+          const inactiveEntries = entries.filter(entry => entry.info.status !== "ok");
+          const renderN = activeEntries.length ? Math.max(...activeEntries.map(entry => entry.info.count || 0)) : 0;
+          const totalRows = (activeEntries.length * renderN) + inactiveEntries.length;
+          let firstItem = true;
+
+          for (let s = 1; s <= renderN; s += 1) {
+            activeEntries.forEach((entry, activeIndex) => {
+              const row = entry.row;
+              let cells = "";
+              if (firstItem) { cells += `<td class="tr-physical-item" rowspan="${totalRows}">${itemHtml}</td>`; firstItem = false; }
+              cells += `<td>${subHtml(row)}</td><td>${critHtml(row)}</td>`;
+              if (activeIndex === 0) cells += `<td rowspan="${activeEntries.length}">${trReportText(trPhysical1DmFromRandom(row.id, s), "-")}</td>`;
+              cells += `<td>${resultOf(row, s, entry.info)}</td>`;
+              rowsHtml += `<tr>${cells}</tr>`;
+            });
+          }
+
+          inactiveEntries.forEach((entry, inactiveIndex) => {
+            const row = entry.row;
+            let cells = "";
+            if (firstItem) { cells += `<td class="tr-physical-item" rowspan="${totalRows}">${itemHtml}</td>`; firstItem = false; }
+            cells += `<td>${subHtml(row)}</td><td>${critHtml(row)}</td>`;
+            if (inactiveIndex === 0) cells += `<td rowspan="${inactiveEntries.length}"></td>`;
+            cells += `<td>${resultOf(row, 1, entry.info)}</td>`;
+            rowsHtml += `<tr>${cells}</tr>`;
+          });
+          return;
+        }
+
+        const info = entries[0].info;
 
         if (info.status !== "ok") {
-          const label = info.status === "omit" ? "생략" : "미해당";
+          const label = info.status === "omit" ? "생략" : info.status === "manual" ? "수량 입력 필요" : "미해당";
           if (hasSub) {
             leaves.forEach((leaf, li) => {
               let cells = "";
               if (li === 0) cells += `<td class="tr-physical-item" rowspan="${leaves.length}">${itemHtml}</td>`;
               cells += `<td>${subHtml(leaf)}</td><td>${critHtml(leaf)}</td>`;
-              if (li === 0) cells += `<td rowspan="${leaves.length}"></td>`;
-              cells += `<td>${label}</td>`;
+              if (frDmLast) {
+                if (li === 0) cells += `<td rowspan="${leaves.length}"></td>`;
+                cells += `<td>${label}</td>`;
+              } else {
+                if (li === 0) cells += `<td rowspan="${leaves.length}"></td>`;
+                cells += `<td>${label}</td>`;
+              }
               rowsHtml += `<tr>${cells}</tr>`;
             });
           } else {
-            rowsHtml += `<tr><td colspan="2">${itemHtml}</td><td>${critHtml(leaves[0])}</td><td></td><td>${label}</td></tr>`;
+            rowsHtml += frDmLast
+              ? `<tr><td colspan="2">${itemHtml}</td><td>${critHtml(leaves[0])}</td><td></td><td>${label}</td></tr>`
+              : `<tr><td colspan="2">${itemHtml}</td><td>${critHtml(leaves[0])}</td><td></td><td>${label}</td></tr>`;
           }
           return;
         }
@@ -10799,8 +11652,13 @@
               let cells = "";
               if (firstItem) { cells += `<td class="tr-physical-item" rowspan="${totalRows}">${itemHtml}</td>`; firstItem = false; }
               cells += `<td>${subHtml(leaf)}</td><td>${critHtml(leaf)}</td>`;
-              if (li === 0) cells += `<td rowspan="${leaves.length}">${trReportText(dm, "-")}</td>`;
-              cells += `<td>${resultOf(leaf, s, info)}</td>`;
+              if (frDmLast) {
+                if (li === 0) cells += `<td rowspan="${leaves.length}">${trReportText(dm, "-")}</td>`;
+                cells += `<td>${resultOf(leaf, s, info)}</td>`;
+              } else {
+                if (li === 0) cells += `<td rowspan="${leaves.length}">${trReportText(dm, "-")}</td>`;
+                cells += `<td>${resultOf(leaf, s, info)}</td>`;
+              }
               rowsHtml += `<tr>${cells}</tr>`;
             });
           }
@@ -10809,7 +11667,9 @@
           for (let s = 1; s <= renderN; s++) {
             let cells = "";
             if (s === 1) cells += `<td class="tr-physical-item" colspan="2" rowspan="${renderN}">${itemHtml}</td><td rowspan="${renderN}">${critHtml(row)}</td>`;
-            cells += `<td>${trReportText(trPhysical1DmFromRandom(row.id, s), "-")}</td><td>${resultOf(row, s, info)}</td>`;
+            cells += frDmLast
+              ? `<td>${trReportText(trPhysical1DmFromRandom(row.id, s), "-")}</td><td>${resultOf(row, s, info)}</td>`
+              : `<td>${trReportText(trPhysical1DmFromRandom(row.id, s), "-")}</td><td>${resultOf(row, s, info)}</td>`;
             rowsHtml += `<tr>${cells}</tr>`;
           }
         }
@@ -10873,8 +11733,10 @@
           </tbody>
         </table>`;
 
-      const defInfo = trPhysicalSampleInfo("A");
+      const defInfo = trPhysicalSampleInfo(isFRCNCOMaterial() ? "C" : "A");
       const dn = defInfo.status === "ok" ? defInfo.count : 0;
+      const limitResultTotalWidth = isFRCNCOMaterial(b.itemName) ? 21.6 : 36;
+      const limitCriteriaWidth = isFRCNCOMaterial(b.itemName) ? 32.4 : 18;
       const limitSection = (title, rows) => {
         const dmHead = dn
           ? Array.from({ length: dn }, (_, i) => { const v = trRandomSampleValue("insulSemi", i + 1); return `<th>${v ? `D/M ${trEsc(v)}` : `시료 ${i + 1}`}</th>`; }).join("")
@@ -10896,29 +11758,30 @@
         return `
           <h4 class="tr-rpt-sec">${title}</h4>
           <table class="tr-data-tbl tr-phys2-tbl">
-            <colgroup><col style="width:24%"><col style="width:22%"><col style="width:18%">${Array.from({ length: dn || 1 }, () => `<col style="width:${(36 / (dn || 1)).toFixed(2)}%">`).join("")}</colgroup>
+            <colgroup><col style="width:24%"><col style="width:22%"><col style="width:${limitCriteriaWidth}%">${Array.from({ length: dn || 1 }, () => `<col style="width:${(limitResultTotalWidth / (dn || 1)).toFixed(2)}%">`).join("")}</colgroup>
             <thead><tr><th colspan="2" rowspan="2">시험항목</th><th rowspan="2">기준</th><th colspan="${dn || 1}">시험결과</th></tr><tr>${dmHead}</tr></thead>
             <tbody>${body}</tbody>
           </table>`;
       };
-      const impurity = TR_PHYSICAL2_LIMIT_ROWS.filter(r => r.section === "절연층 이물질 검사");
-      const voids = TR_PHYSICAL2_LIMIT_ROWS.filter(r => r.section === "반도전층 계면의 보이드 및 돌기 측정");
+      const impurity = TR_PHYSICAL2_LIMIT_ROWS.filter(r => r.section === "절연층 기공 및 이물질, 내부반도전층 굴곡깊이 검사");
+      const voids = TR_PHYSICAL2_LIMIT_ROWS.filter(r => r.section === "반도전층 계면 돌기 검사");
 
       return `
         <section class="tr-report-page">
           <div class="tr-rpt-sub">물리적 특성시험 DATA</div>
           ${trReportHeaderHtml(b)}
           ${section1}
-          ${limitSection("2. 절연층 이물질 검사", impurity)}
-          ${limitSection("3. 반도전층 계면의 보이드 및 돌기 측정", voids)}
+          ${limitSection("2. 절연층 기공 및 이물질, 내부반도전층 굴곡깊이 검사", impurity)}
+          ${limitSection("3. 반도전층 계면 돌기 검사", voids)}
         </section>`;
     }
 
     // ===== 시트 6) 연1회 시험항목 =====
     function trReportAnnualSheets(b) {
       if (!trAnnualVisible()) return "";
-      return TR_ANNUAL_SHEETS.map((sheet, idx) => {
-        let body = `<div class="tr-rpt-sec">시험 방법</div><div class="tr-rpt-method">${trReportMultiline(sheet.method, "")}</div>`;
+      return trActivePeriodicSheets(b.itemName).map((sheet, idx) => {
+        const method = isFRCNCOMaterial(b.itemName) && sheet.frMethod ? sheet.frMethod : sheet.method;
+        let body = `<div class="tr-rpt-sec">시험 방법</div><div class="tr-rpt-method">${trReportMultiline(method, "")}</div>`;
         if (sheet.methodFigure) body += `<div class="tr-rpt-method-figure">${sheet.methodFigure}</div>`;
         if (sheet.volume) {
           const info = trPhysicalSampleInfo("B");
@@ -10944,7 +11807,7 @@
         }
         return `
           <section class="tr-report-page">
-            <div class="tr-rpt-sub">연1회 시험 — ${idx + 1}. ${trEsc(sheet.title)}</div>
+            <div class="tr-rpt-sub">${trPeriodicCycleLabel(sheet, b.itemName)} — ${idx + 1}. ${trEsc(sheet.title)}</div>
             ${trReportHeaderHtml(b)}
             ${body}
           </section>`;
@@ -11057,6 +11920,11 @@
             /* 물리1·2 시험데이터 표: 행 높이 크게·균일 (자동맞춤 스크립트로 1페이지 내 축소) */
             .tr-phys1-tbl td { height:30px; }
             .tr-phys1-tbl td:last-child { white-space:nowrap; }
+            .tr-phys1-tbl .tr-physical-criteria-split { margin:-3px -4px; }
+            .tr-phys1-tbl .tr-physical-criteria-split > div { display:grid; grid-template-columns:30% 70%; align-items:stretch; min-height:24px; }
+            .tr-phys1-tbl .tr-physical-criteria-split > div + div { border-top:1px solid #000; }
+            .tr-phys1-tbl .tr-physical-criteria-split b, .tr-phys1-tbl .tr-physical-criteria-split span { display:flex; align-items:center; justify-content:center; padding:2px 3px; line-height:1.25; }
+            .tr-phys1-tbl .tr-physical-criteria-split span { border-left:1px solid #000; }
             .tr-phys2-tbl th, .tr-phys2-tbl td { font-size:11px; padding:3px 5px; line-height:1.3; word-break:keep-all; }
             .tr-rpt-bad { color:#d00000; font-weight:800; }
             .tr-rpt-foot { text-align:center; font-size:18px; font-weight:800; letter-spacing:6px; margin-top:24px; }
@@ -11180,6 +12048,8 @@
       if (samplingError) { alert(samplingError); goTRStep("trStep1"); return false; }
       const dateError = getTRDateValidationError();
       if (dateError) { alert(dateError); goTRStep("trStep1"); el.trTestStartDate?.focus(); return false; }
+      // TR 3드럼 이하 생략 여부가 아직 결정되지 않았다면 출력/완료 전 반드시 확인한다.
+      notifyTRLowDrumQty();
       return true;
     }
     // 전 단계 데이터 완성도 검사 (랜덤발취 시료 수량 기준). 미입력 항목 목록 반환
@@ -11194,6 +12064,9 @@
       TR_RANDOM_ITEMS.forEach(it => { randInfo[it.id] = trRandomItemInfo(it); });
       const cnt = id => (randInfo[id] && randInfo[id].status === "ok") ? randInfo[id].count
         : (randInfo[id] && randInfo[id].status === "manual") ? randInfo[id].count : 0;
+
+      // 제조 시작·끝번호와 활성 시료번호의 정수/범위 검증
+      trRandomValidationErrors().forEach(push);
 
       // (c) 랜덤발취 시료번호 — 시료 수량만큼 입력
       TR_RANDOM_ITEMS.forEach(item => {
@@ -11210,14 +12083,14 @@
       const structureState = trStructureInputState(sCount);
       if (structureState.status !== "none") {
         const structureMissingStart = missing.length;
-        if (TR_STRUCTURE_CRITERIA[el.trItemDetail?.value || ""]) {
+        if (getTRStructureCriteria()) {
           if (!filled(trStructureWireMark)) push("구조검사: 전선표시");
           if (!filled(trStructureAppearance)) push("구조검사: 외관검사 판정");
         }
         if (sCount > 0) {
-          TR_STRUCTURE_TABLE_ROWS.forEach(row => {
+          getTRStructureTableRows().forEach(row => {
             if (row.mode === "formula") return;
-            const title = (typeof row.title === "function" ? row.title(TR_STRUCTURE_CRITERIA[el.trItemDetail?.value || ""] || {}) : row.title).replace(/\n/g, " ");
+            const title = (typeof row.title === "function" ? row.title(getTRStructureCriteria() || {}) : row.title).replace(/\n/g, " ");
             for (let s = 1; s <= sCount; s++) {
               let ok = true;
               if (row.mode === "singleText") ok = trTexts(row.id, s).length >= 1;
@@ -11237,7 +12110,7 @@
 
       // 2) 전기특성
       const spec = el.trItemDetail?.value || "";
-      if (TR_ELECTRICAL_CRITERIA[spec]) {
+      if (getTRElectricalCriteria(spec)) {
         const drumCount = getTRElectricalDrumCount();
         const store = trElectricalValues[spec] || {};
         const colTargetInfo = (col) => {
@@ -11267,6 +12140,7 @@
           ["F", "절연저항", cnt("insulationR")], ["H", "도체저항", cnt("conductorR")],
           ["I", "정전용량", cnt("capacitance")], ["J", "부분방전", cnt("pd")], ["K", "유전정접", cnt("dielectric")],
         ];
+        if (isFRCNCOMaterial()) colReq.push(["L", "충격내전압", cnt("impulse")]);
         colReq.forEach(([col, name, req]) => {
           if (req <= 0) return;
           const targetInfo = colTargetInfo(col);
@@ -11286,6 +12160,14 @@
           if (matchedCount < req) push(`전기특성: ${name} (${matchedCount}/${req})`);
         });
         for (let r = 1; r <= drumCount; r++) { if (!filled(store[`${r}:E`])) { push("전기특성: 내전압 미선택 행 있음"); break; } }
+        for (let r = 1; r <= drumCount; r++) {
+          if (store[`${r}:E`] === "기타" && !filled(store[`${r}:E_text`])) {
+            push(`전기특성: ${r}행 내전압 기타 내용 미입력`);
+          }
+          if (isFRCNCOMaterial() && store[`${r}:L`] === "기타" && !filled(store[`${r}:L_text`])) {
+            push(`전기특성: ${r}행 충격내전압 기타 내용 미입력`);
+          }
+        }
         for (let r = 1; r <= drumCount; r++) { if (!filled(store[`${r}:A`])) { push("전기특성: D/M No. 미입력 행 있음"); break; } }
         const dmRowsByKey = new Map();
         for (let r = 1; r <= drumCount; r++) {
@@ -11301,8 +12183,8 @@
       }
 
       // 3) 물리적특성1
-      TR_PHYSICAL1_ROWS.forEach(row => {
-        const info = trPhysicalSampleInfo(row.pattern);
+      getTRPhysical1Rows().forEach(row => {
+        const info = trPhysical1RowSampleInfo(row, { askLowDrum: false });
         if (info.status !== "ok") return;
         // 원격시험 체크 시 반도전층 체적저항(내도/외도) 측정값 검사 제외
         if (trVolumeRemoteTest && (row.calc === "innerVolume" || row.calc === "outerVolume")) return;
@@ -11319,7 +12201,15 @@
           else if (row.type === "range") ok = filled(trPhysical1Value(`${row.id}#${s}:min`)) && filled(trPhysical1Value(`${row.id}#${s}:max`));
           else if (row.type === "number") ok = filled(trPhysical1Value(`${row.id}#${s}:value`));
           else if (row.type === "autoDropdown" && calcTRPhysical2Evaluation(s).detailFail) ok = true; // 물리2 한계초과로 '불량' 자동 잠금 → 입력된 것으로 간주
-          else ok = filled(trPhysical1Value(`${row.id}#${s}:result`));
+          else {
+            const result = trPhysical1Value(`${row.id}#${s}:result`);
+            ok = filled(result);
+            if (result === "데이터 입력" || result === "기타") {
+              ok = filled(trPhysical1Value(`${row.id}#${s}:custom`));
+            } else if (result === "공인기관 시험의뢰") {
+              ok = filled(trPhysicalAgencyText(sampleRowId));
+            }
+          }
           if (!ok) { push(`물리적특성1: ${itemName}`); break; }
         }
       });
@@ -11332,17 +12222,17 @@
           if (need.some(bse => !filled(trPhysical2Value(`${bse}#${s}`)))) { push("물리적특성2: 반도전층 체적저항율 측정값"); break; }
         }
       }
-      const defInfo = trPhysicalSampleInfo("A");
+      const defInfo = trPhysicalSampleInfo(isFRCNCOMaterial() ? "C" : "A");
       if (defInfo.status === "ok") {
         for (let s = 1; s <= defInfo.count; s++) {
-          if (TR_PHYSICAL2_LIMIT_ROWS.some(rw => !filled(trPhysical2Value(`${rw.id}#${s}`)))) { push("물리적특성2: 절연층 이물질/보이드 검사값"); break; }
+          if (TR_PHYSICAL2_LIMIT_ROWS.some(rw => !filled(trPhysical2Value(`${rw.id}#${s}`)))) { push("물리적특성2: 절연층 기공·이물질/반도전층 계면 돌기 검사값"); break; }
         }
       }
 
       // 5) 연1회 시험항목
       if (trAnnualVisible()) {
-        TR_ANNUAL_SHEETS.forEach((sheet, idx) => {
-          const label = `연1회: ${idx + 1}. ${sheet.title}`;
+        trActivePeriodicSheets().forEach((sheet, idx) => {
+          const label = `${trPeriodicCycleLabel(sheet)}: ${idx + 1}. ${sheet.title}`;
           if (sheet.text && !filled(trAnnualText[sheet.id])) push(`${label} 결과`);
           if (sheet.photos && !((trAnnualPhotos[sheet.id] || []).length)) push(`${label} 사진`);
           if (sheet.dielectric) {
@@ -11393,6 +12283,13 @@
     // 컨테이너 참조가 로드시점 문제로 null이 되는 경우를 방지하기 위해 항상 새로 조회
     function getTRPhotoGridEl() {
       return trPhotoGridContainer || document.getElementById("trPhotoGridContainer");
+    }
+    function trPhysical1ValuesForSave() {
+      const values = { ...trPhysical1Values };
+      if (isFRCNCOMaterial() || activeTRMaterial === "TR CNCE-W" || activeTRMaterial === "TR CNCE-W/AL") {
+        Object.keys(values).filter(key => key.startsWith("compoundDrop#")).forEach(key => delete values[key]);
+      }
+      return values;
     }
     function trScrapeStep7Photos() {
       const list = [];
@@ -11465,13 +12362,13 @@
           wire_mark: trStructureWireMark,
           appearance: trStructureAppearance,
           sample_nos: trReportStructureSampleNos(),
-          values: { ...trStructureValues },
+          values: trStructureValuesForSave(b.itemName),
         },
         electrical: {
           contract: trElectricalContractValues[b.spec] || "",
           values: trElectricalValues[b.spec] || {},
         },
-        physical1: { ...trPhysical1Values },
+        physical1: trPhysical1ValuesForSave(),
         physical2: { ...trPhysical2Values },
         volume_remote_test: trVolumeRemoteTest,
         annual: { visible: trAnnualVisible(), text: { ...trAnnualText } },
@@ -11491,8 +12388,7 @@
       };
     }
     function trStructureScrapeValues() {
-      saveTRStructureState();
-      return { ...trStructureValues };
+      return trStructureValuesForSave();
     }
     function downloadTRQIR(obj) {
       const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
@@ -11681,6 +12577,7 @@
       trStructureAppearance = qir.structure?.appearance || "";
       Object.keys(trStructureValues).forEach(k => delete trStructureValues[k]);
       Object.assign(trStructureValues, qir.structure?.values || {});
+      trRemoveFRExcludedStructureValues(materialFromFile);
 
       // 전기특성
       if (spec) {
@@ -11690,6 +12587,9 @@
       // 물리1·물리2·연1회
       Object.keys(trPhysical1Values).forEach(k => delete trPhysical1Values[k]);
       Object.assign(trPhysical1Values, qir.physical1 || {});
+      if (isFRCNCOMaterial(materialFromFile) || materialFromFile === "TR CNCE-W" || materialFromFile === "TR CNCE-W/AL") {
+        Object.keys(trPhysical1Values).filter(key => key.startsWith("compoundDrop#")).forEach(key => delete trPhysical1Values[key]);
+      }
       Object.keys(trPhysical2Values).forEach(k => delete trPhysical2Values[k]);
       Object.assign(trPhysical2Values, qir.physical2 || {});
       trVolumeRemoteTest = !!qir.volume_remote_test;
@@ -11712,6 +12612,7 @@
       updateTRSummaryPanel();
       // 구조검사 DOM 채움(보고서/스크레이프용) — 측정값은 trStructureValues에서 읽음
       renderTRStructureStep2();
+      captureFRSamplingState();
     }
     function editTRFromQIR(qir) {
       showScreen("tr");
@@ -11752,6 +12653,8 @@
           el.trInspectionType?.focus();
           return;
         }
+        // Step2를 건너뛰고 랜덤발취·완료 단계로 이동해도 생략 여부를 반드시 묻는다.
+        notifyTRLowDrumQty();
       }
       document.getElementById("trStep1")?.classList.toggle("active", stepId === "trStep1");
       document.getElementById("trStep2")?.classList.toggle("active", stepId === "trStep2");
@@ -14290,6 +15193,7 @@
     }
     if (el.trDrumQty) {
       el.trDrumQty.addEventListener("change", () => {
+        if (!handleFRSamplingConfigChange()) return;
         resetTRLowDrumOmitChoice();
         notifyTRLowDrumQty();
         if (document.getElementById("trStep2")?.classList.contains("active")) {
@@ -14303,6 +15207,7 @@
     [el.trQualityGrade, el.trInspectionType].forEach(field => {
       if (!field) return;
       field.addEventListener("change", () => {
+        if (!handleFRSamplingConfigChange()) return;
         if (document.getElementById("trStep2")?.classList.contains("active")) {
           renderTRStructureStep2();
         }
@@ -14311,6 +15216,14 @@
         }
       });
     });
+    if (el.trRetestStatus) {
+      el.trRetestStatus.addEventListener("change", () => {
+        if (!handleFRSamplingConfigChange()) return;
+        updateTRAnnualStepVisibility();
+        if (document.getElementById("trStep2")?.classList.contains("active")) renderTRStructureStep2();
+        if (document.getElementById("trStep3")?.classList.contains("active")) renderTRElectricalStep3();
+      });
+    }
 
     [el.inspectorName, el.testerName, el.inspectionType, el.envLocation, el.envWeather, el.envTemp, el.envHumidity, el.finalRemark]
       .forEach(field => {
