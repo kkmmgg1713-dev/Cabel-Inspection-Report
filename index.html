@@ -2986,7 +2986,7 @@
           <button class="stepBtn" type="button" id="btnTRStep3">Step3 전기특성</button>
           <button class="stepBtn" type="button" id="btnTRStep4">Step4 물리적특성1</button>
           <button class="stepBtn" type="button" id="btnTRStep5">Step5 물리적특성2</button>
-          <button class="stepBtn" type="button" id="btnTRStep6" style="display:none;">Step6 연1회 시험항목</button>
+          <button class="stepBtn" type="button" id="btnTRStep6" style="display:none;">Step6 연1회시험</button>
           <button class="stepBtn" type="button" id="btnTRStep7">Step7 시험사진</button>
           <button class="stepBtn" type="button" id="btnTRCertificate">Step8 확인서</button>
           <button class="stepBtn" type="button" id="btnTRStep8">Step9 최종</button>
@@ -3194,7 +3194,7 @@
             <div class="card tr-physical-panel">
               <div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px;">
                 <div>
-                  <h3>Step6 연1회 시험항목</h3>
+                  <h3>Step6 연1회시험</h3>
                   <div class="mini" id="trAnnualNote">연1회(또는 C·D등급 반기) 시험 시 작성하는 항목입니다. 시험방법은 고정 표시되며, 결과·사진을 입력합니다.</div>
                 </div>
                 <div class="pill" id="trAnnualSpecPill">TR CNCE-W</div>
@@ -7842,7 +7842,6 @@
     }
 
     function trActivePeriodicSheets(materialName = activeTRMaterial) {
-      if (!isFRCNCOMaterial(materialName)) return TR_ANNUAL_SHEETS;
       return TR_ANNUAL_SHEETS.filter(sheet => {
         const pattern = sheet.id === "volumeResistivity" ? "B" : "A";
         return trPhysicalSampleInfo(pattern, { askLowDrum: false }).status === "ok";
@@ -7850,31 +7849,27 @@
     }
 
     function trPeriodicCycleLabel(sheet, materialName = activeTRMaterial) {
-      return isFRCNCOMaterial(materialName) && sheet.frCycle ? sheet.frCycle : "연1회 시험";
+      return getTRInspectionTypeForSampling() === "반기" ? "반기 시험" : "연1회 시험";
     }
 
     function trAnnualVisible() {
       const grade = el.trQualityGrade?.value || "";
       const type = getTRInspectionTypeForSampling();
       if (!grade || !type) return false;
-      if (isFRCNCOMaterial()) return trActivePeriodicSheets().length > 0;
       if (type === "연1회") return true;
-      if ((grade === "C" || grade === "D") && type === "반기") return true;
-      return false;
+      return (grade === "C" || grade === "D") && type === "반기";
     }
 
     function updateTRAnnualStepVisibility() {
       const vis = trAnnualVisible();
       if (el.btnTRStep6) el.btnTRStep6.style.display = vis ? "" : "none";
       if (el.btnTRGoStep6) el.btnTRGoStep6.style.display = vis ? "" : "none";
-      const periodicTitle = isFRCNCOMaterial() ? "주기시험 항목" : "연1회 시험항목";
+      const periodicTitle = "연1회시험";
       if (el.btnTRStep6) el.btnTRStep6.textContent = `Step6 ${periodicTitle}`;
       const periodicHeading = document.querySelector("#trStep6 h3");
       if (periodicHeading) periodicHeading.textContent = `Step6 ${periodicTitle}`;
       const periodicNote = document.getElementById("trAnnualNote");
-      if (periodicNote) periodicNote.textContent = isFRCNCOMaterial()
-        ? "품질등급과 시험종류에 따라 활성화되는 분기·연1회 시험항목입니다. 시험결과는 필수이며, 사진 첨부는 선택사항입니다."
-        : "연1회(또는 C·D등급 반기) 시험 시 작성하는 항목입니다. 시험결과는 필수이며, 사진 첨부는 선택사항입니다.";
+      if (periodicNote) periodicNote.textContent = "연1회 시험 또는 C·D등급 반기 시험 시 작성하는 항목입니다. 시험결과는 필수이며, 사진 첨부는 선택사항입니다.";
       // 시험사진 스텝 번호: Step6 표시 시 Step7, 미표시 시 Step6
       const photoStepNo = vis ? "7" : "6";
       if (el.btnTRStep7) el.btnTRStep7.textContent = `Step${photoStepNo} 시험사진`;
@@ -11084,14 +11079,34 @@
       const contract = trElectricalContractValue(spec, b.itemName);
       const conductorLimit = trElectricalConductorLimit(spec, b.itemName, contract);
       const sampleInfoMap = getTRElectricalSampleInfoMap();
-      const showImpulse = isFRSummary && !!sampleInfoMap.L && trReportElecIsTarget(sampleInfoMap.L);
-      const showConductor = !isFRSummary || trReportElecIsTarget(sampleInfoMap.H);
-      const showDielectric100 = !isFRSummary || trReportElecIsTarget(sampleInfoMap.K);
-      const showCapacitance = !isFRSummary || trReportElecIsTarget(sampleInfoMap.I);
-      const showPartialDischarge = !isFRSummary || trReportElecIsTarget(sampleInfoMap.J);
-      const showInsulationResistance = !isFRSummary || trReportElecIsTarget(sampleInfoMap.F);
-      const activeP1Ids = ids => isFRSummary ? ids.filter(id => trReportP1Applicable(id, b.itemName)) : ids;
-      const showP1Group = ids => !isFRSummary || activeP1Ids(ids).length > 0;
+      const frNotApplicable = "해당없음";
+      const conductorActive = !isFRSummary || trReportElecIsTarget(sampleInfoMap.H);
+      const dielectric100Active = !isFRSummary || trReportElecIsTarget(sampleInfoMap.K);
+      const capacitanceActive = !isFRSummary || trReportElecIsTarget(sampleInfoMap.I);
+      const partialDischargeActive = !isFRSummary || trReportElecIsTarget(sampleInfoMap.J);
+      const insulationResistanceActive = !isFRSummary || trReportElecIsTarget(sampleInfoMap.F);
+      const impulseActive = !isFRSummary || trReportElecIsTarget(sampleInfoMap.L);
+      // FR 성적서 1페이지는 선택 주기와 관계없이 연1회 시험 항목 전체를 유지한다.
+      const showImpulse = isFRSummary && !!sampleInfoMap.L;
+      const showConductor = !isFRSummary || !!sampleInfoMap.H;
+      const showDielectric100 = !isFRSummary || !!sampleInfoMap.K;
+      const showCapacitance = !isFRSummary || !!sampleInfoMap.I;
+      const showPartialDischarge = !isFRSummary || !!sampleInfoMap.J;
+      const showInsulationResistance = !isFRSummary || !!sampleInfoMap.F;
+      const existingP1Ids = ids => isFRSummary
+        ? ids.filter(id => !!trReportP1Row(id, b.itemName))
+        : ids;
+      const activeP1Ids = ids => isFRSummary
+        ? existingP1Ids(ids).filter(id => trReportP1Applicable(id, b.itemName))
+        : ids;
+      const showP1Group = ids => !isFRSummary || existingP1Ids(ids).length > 0;
+      const p1GroupResult = (ids, fallback = "별 첨") => {
+        const activeIds = activeP1Ids(ids);
+        return isFRSummary && activeIds.length === 0
+          ? { text: frNotApplicable, bad: false }
+          : trReportP1CombinedStatus(activeIds, fallback);
+      };
+      const frElectricalResult = (active, value) => isFRSummary && !active ? frNotApplicable : value;
       const hVals = trReportElecColValues(spec, "H", sampleInfoMap);
       const iVals = trReportElecColValues(spec, "I", sampleInfoMap);
       const jVals = trReportElecColValues(spec, "J", sampleInfoMap);
@@ -11131,6 +11146,7 @@
       const dielectricTempRowIds = isFRSummary
         ? ["dielectricRoom", "dielectric60", "dielectric90"]
         : ["dielectric90", "dielectric130", "dielectricRoom"];
+      const dielectricTempActive = !isFRSummary || activeP1Ids(dielectricTempRowIds).length > 0;
       {
         const dn = dielTempInfo.status === "ok" ? dielTempInfo.count : 0;
         dielectricTempRowIds.forEach(id => {
@@ -11142,20 +11158,24 @@
           }
         });
       }
-      const tempChar = dielTempInfo.status === "na"
-        ? "해당사항 없음"
-        : dielTempInfo.status === "omit"
-          ? "생략"
-          : dielVals.length ? `${summaryNumber(Math.min(...dielVals), 2, 3)} ~ ${summaryNumber(Math.max(...dielVals), 2, 3)}` : "-";
+      const tempChar = isFRSummary && !dielectricTempActive
+        ? frNotApplicable
+        : dielTempInfo.status === "na"
+          ? "해당사항 없음"
+          : dielTempInfo.status === "omit"
+            ? "생략"
+            : dielVals.length ? `${summaryNumber(Math.min(...dielVals), 2, 3)} ~ ${summaryNumber(Math.max(...dielVals), 2, 3)}` : "-";
       const tempCharBad = dielVals.some(value => value > (isFRSummary ? 0.4 : 0.5));
       const showDielectricTemp = showP1Group(dielectricTempRowIds);
       const badIf = cond => cond ? ' class="tr-rpt-bad"' : "";
       const voltage = trReportVoltageResult(spec);
       const vText = voltage.bad ? "불 량" : (voltage.text === "-" ? "-" : "양 호");
       const impulse = showImpulse ? trReportImpulseResult(spec) : null;
-      const impulseText = impulse ? (impulse.bad ? "불 량" : (impulse.text === "-" ? "-" : "양 호")) : "";
+      const impulseText = impulse
+        ? frElectricalResult(impulseActive, impulse.bad ? "불 량" : (impulse.text === "-" ? "-" : "양 호"))
+        : "";
       const impulseRowHtml = impulse
-        ? `<tr><td>충격내전압</td><td>절연체</td><td>1.2×50㎲/정․부극성 각 10회</td><td${badIf(impulse.bad)}>${impulseText}</td></tr>`
+        ? `<tr><td>충격내전압</td><td>절연체</td><td>1.2×50㎲/정․부극성 각 10회</td><td${badIf(impulseActive && impulse.bad)}>${impulseText}</td></tr>`
         : "";
 
       // 체적저항율: 전체 시료 중 가장 큰 값(상한 기준의 최악값)
@@ -11174,7 +11194,10 @@
       const outerVolMax = outerVolValues.length ? Math.max(...outerVolValues) : NaN;
       const innerVolBad = !trVolumeRemoteTest && volEvaluations.some(ev => ev.innerVolume.fail);
       const outerVolBad = !trVolumeRemoteTest && volEvaluations.some(ev => ev.outerVolume.fail);
-      const volumeStatusText = volInfo.status === "na" ? "해당사항 없음" : (volInfo.status === "omit" ? "생략" : "");
+      const volumeActive = !isFRSummary || activeP1Ids(["semiVolumeInner", "semiVolumeOuter"]).length > 0;
+      const volumeStatusText = isFRSummary && !volumeActive
+        ? frNotApplicable
+        : volInfo.status === "na" ? "해당사항 없음" : (volInfo.status === "omit" ? "생략" : "");
       const innerVol = volumeStatusText || (trVolumeRemoteTest ? "양 호" : trVolFmt(innerVolMax));
       const outerVol = volumeStatusText || (trVolumeRemoteTest ? "양 호" : trVolFmt(outerVolMax));
 
@@ -11192,27 +11215,30 @@
       }
       const peelMin = peelMins.length ? Math.min(...peelMins) : null;
       const peelMax = peelMaxs.length ? Math.max(...peelMaxs) : null;
-      const peel = peelInfo.status === "na"
-        ? "해당사항 없음"
-        : peelInfo.status === "omit"
-          ? "생략"
-          : peelMin != null || peelMax != null ? `${peelMin != null ? summaryNumber(peelMin, 1, 2) : "-"} ~ ${peelMax != null ? summaryNumber(peelMax, 1, 2) : "-"}` : "-";
+      const peelActive = !isFRSummary || activeP1Ids(["outerSemiPeel"]).length > 0;
+      const peel = isFRSummary && !peelActive
+        ? frNotApplicable
+        : peelInfo.status === "na"
+          ? "해당사항 없음"
+          : peelInfo.status === "omit"
+            ? "생략"
+            : peelMin != null || peelMax != null ? `${peelMin != null ? summaryNumber(peelMin, 1, 2) : "-"} ~ ${peelMax != null ? summaryNumber(peelMax, 1, 2) : "-"}` : "-";
       const peelBad = (peelMin != null && peelMin < 4) || (peelMax != null && peelMax > 45);
 
       const appearBad = trReportStructureFail();
       const structureDefaultGood = trStructureInputState().status === "none";
       const appearRes = appearBad ? "불 량" : (trStructureAppearance === "양호" || structureDefaultGood ? "양 호" : "-");
-      const neutralWaterIds = activeP1Ids(["neutralWater"]);
-      const conductorWaterIds = activeP1Ids(["conductorWater"]);
-      const insulSemiIds = activeP1Ids(["insulationSemiInspection"]);
-      const neutralWater = trReportP1CombinedStatus(neutralWaterIds, "별 첨");
-      const conductorWater = trReportP1CombinedStatus(conductorWaterIds, "별 첨");
-      const insulSemi = trReportP1CombinedStatus(insulSemiIds, "별 첨");
+      const neutralWaterIds = ["neutralWater"];
+      const conductorWaterIds = ["conductorWater"];
+      const insulSemiIds = ["insulationSemiInspection"];
+      const neutralWater = p1GroupResult(neutralWaterIds);
+      const conductorWater = p1GroupResult(conductorWaterIds);
+      const insulSemi = p1GroupResult(insulSemiIds);
       const showVolume = showP1Group(["semiVolumeInner", "semiVolumeOuter"]);
       const showPeel = showP1Group(["outerSemiPeel"]);
-      const showNeutralWater = !isFRSummary || neutralWaterIds.length > 0;
-      const showConductorWater = !isFRSummary || conductorWaterIds.length > 0;
-      const showInsulSemi = !isFRSummary || insulSemiIds.length > 0;
+      const showNeutralWater = showP1Group(neutralWaterIds);
+      const showConductorWater = showP1Group(conductorWaterIds);
+      const showInsulSemi = showP1Group(insulSemiIds);
 
       // 교류파괴가 있는 기존 품목: 전체 시료 중 가장 낮은 파괴지점이 최악값
       const showAcBreakdown = !!trReportP1Row("acBreakdown", b.itemName);
@@ -11242,40 +11268,38 @@
       const analysisIds = b.itemName === "FR CNCO-W"
         ? ["tensileElongation", "ionicImpurity", "crosslinkInner", "crosslinkFiller", "crosslinkOuter"]
         : ["tensileElongation", "ionicImpurity", "sheathProperty"];
-      const activeAnalysisIds = activeP1Ids(analysisIds);
-      const analysis = trReportP1CombinedStatus(activeAnalysisIds, "별 첨");
-      const showAnalysis = !isFRSummary || activeAnalysisIds.length > 0;
-      const environmentColdIds = activeP1Ids(["environmentCold", "environmentOil"]);
-      const environmentAnnualIds = activeP1Ids([
+      const analysis = p1GroupResult(analysisIds);
+      const showAnalysis = showP1Group(analysisIds);
+      const environmentColdIds = ["environmentCold", "environmentOil"];
+      const environmentAnnualIds = [
         "environmentFlameSheath", "environmentOxygenIndex", "environmentCorrosivity", "environmentToxicity", "environmentSmokeDensity",
-      ]);
-      const environmentIds = environmentAnnualIds.length
-        ? [...environmentColdIds, ...environmentAnnualIds]
-        : environmentColdIds;
-      const environment = trReportP1CombinedStatus(environmentIds, "별 첨");
-      const environmentTitle = environmentAnnualIds.length ? "내환경성시험" : "내한(유) 시험";
+      ];
+      const environmentIds = [...environmentColdIds, ...environmentAnnualIds];
+      const environment = p1GroupResult(environmentIds);
+      const showEnvironment = isFRSummary && showP1Group(environmentIds);
+      const environmentTitle = "내환경성시험";
       const conductorBad = condMaxV != null && conductorLimit != null && condMaxV > conductorLimit;
       const dielectricRegularLabel = isFRSummary ? "13.2kV" : "100℃";
       const conductorRowsHtml = !showConductor ? "" : showContract
-          ? `<tr><td rowspan="2">도체저항 20℃ (Ω/㎞)</td><td>규격저항</td><td>${trReportNumberText(condSpec, "-")}</td><td rowspan="2"${badIf(conductorBad)}>${condRes}</td></tr>
+          ? `<tr><td rowspan="2">도체저항 20℃ (Ω/㎞)</td><td>규격저항</td><td>${trReportNumberText(condSpec, "-")}</td><td rowspan="2"${badIf(conductorBad)}>${frElectricalResult(conductorActive, condRes)}</td></tr>
                 <tr><td>계약저항</td><td>${trReportNumberText(contract, "-")}</td></tr>`
-          : `<tr><td>도체저항 20℃ (Ω/㎞)</td><td colspan="2">${trReportNumberText(condSpec, "-")} 이하</td><td${badIf(conductorBad)}>${condRes}</td></tr>`;
+          : `<tr><td>도체저항 20℃ (Ω/㎞)</td><td colspan="2">${trReportNumberText(condSpec, "-")} 이하</td><td${badIf(conductorBad)}>${frElectricalResult(conductorActive, condRes)}</td></tr>`;
       const dielectricRowsHtml = showDielectric100 && showDielectricTemp
-        ? `<tr><td rowspan="2">유전정접 (％)</td><td>${dielectricRegularLabel}</td><td>0.4% 이하</td><td${badIf(dielMaxV != null && dielMaxV > TR_ELECTRICAL_DIELECTRIC_MAX)}>${diel100}</td></tr>
+        ? `<tr><td rowspan="2">유전정접 (％)</td><td>${dielectricRegularLabel}</td><td>0.4% 이하</td><td${badIf(dielMaxV != null && dielMaxV > TR_ELECTRICAL_DIELECTRIC_MAX)}>${frElectricalResult(dielectric100Active, diel100)}</td></tr>
            <tr><td>온도특성</td><td>${isFRSummary ? "0.4% 이하" : "0.5% 이하"}</td><td${badIf(tempCharBad)}>${tempChar}</td></tr>`
         : showDielectric100
-          ? `<tr><td>유전정접 (％)</td><td>${dielectricRegularLabel}</td><td>0.4% 이하</td><td${badIf(dielMaxV != null && dielMaxV > TR_ELECTRICAL_DIELECTRIC_MAX)}>${diel100}</td></tr>`
+          ? `<tr><td>유전정접 (％)</td><td>${dielectricRegularLabel}</td><td>0.4% 이하</td><td${badIf(dielMaxV != null && dielMaxV > TR_ELECTRICAL_DIELECTRIC_MAX)}>${frElectricalResult(dielectric100Active, diel100)}</td></tr>`
           : showDielectricTemp
             ? `<tr><td>유전정접 (％)</td><td>온도특성</td><td>${isFRSummary ? "0.4% 이하" : "0.5% 이하"}</td><td${badIf(tempCharBad)}>${tempChar}</td></tr>`
             : "";
       const capacitanceRowHtml = showCapacitance
-        ? `<tr><td>정 전 용 량 (㎌/㎞)</td><td colspan="2">${trReportNumberText(limits.capacitanceMax, "-")} 이하</td><td${badIf(limits.capacitanceMax != null && capMaxV != null && capMaxV > limits.capacitanceMax)}>${capRes}</td></tr>`
+        ? `<tr><td>정 전 용 량 (㎌/㎞)</td><td colspan="2">${trReportNumberText(limits.capacitanceMax, "-")} 이하</td><td${badIf(limits.capacitanceMax != null && capMaxV != null && capMaxV > limits.capacitanceMax)}>${frElectricalResult(capacitanceActive, capRes)}</td></tr>`
         : "";
       const partialDischargeRowHtml = showPartialDischarge
-        ? `<tr><td>부분방전 시험</td><td colspan="2">10 pC 이하</td><td${badIf(pdMaxV != null && pdMaxV > TR_ELECTRICAL_PARTIAL_DISCHARGE_MAX)}>${pdRes}</td></tr>`
+        ? `<tr><td>부분방전 시험</td><td colspan="2">10 pC 이하</td><td${badIf(pdMaxV != null && pdMaxV > TR_ELECTRICAL_PARTIAL_DISCHARGE_MAX)}>${frElectricalResult(partialDischargeActive, pdRes)}</td></tr>`
         : "";
       const insulationResistanceRowHtml = showInsulationResistance
-        ? `<tr><td>절 연 저 항 (㏁·㎞)</td><td colspan="2">${trReportNumberText(limits.insulationMin, "-")} 이상</td><td${badIf(limits.insulationMin != null && insMinV != null && insMinV < limits.insulationMin)}>${insRes}</td></tr>`
+        ? `<tr><td>절 연 저 항 (㏁·㎞)</td><td colspan="2">${trReportNumberText(limits.insulationMin, "-")} 이상</td><td${badIf(limits.insulationMin != null && insMinV != null && insMinV < limits.insulationMin)}>${frElectricalResult(insulationResistanceActive, insRes)}</td></tr>`
         : "";
       const volumeRowsHtml = showVolume
         ? `<tr><td rowspan="2">반도전층 체적저항율 (Ω·m)</td><td>내 부</td><td>1,000 이하</td><td${badIf(innerVolBad)}>${innerVol}</td></tr>
@@ -11296,7 +11320,7 @@
       const analysisRowHtml = showAnalysis
         ? `<tr><td>${isFRSummary ? "화학분석시험(가교도 등)" : "분  석  시  험"}</td><td colspan="2">구매규격서</td><td${badIf(analysis.bad)}>${trReportText(analysis.text)}</td></tr>`
         : "";
-      const environmentRowHtml = isFRSummary && environmentIds.length
+      const environmentRowHtml = showEnvironment
         ? `<tr><td>${environmentTitle}</td><td colspan="2">구매규격서</td><td${badIf(environment.bad)}>${trReportText(environment.text)}</td></tr>`
         : "";
       const acBreakdownRowHtml = showAcBreakdown
