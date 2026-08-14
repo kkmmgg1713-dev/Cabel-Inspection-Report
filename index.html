@@ -10635,7 +10635,9 @@
     }
 
     function printTRRandom() {
-      const errors = trRandomValidationErrors({ includeMissingSamples: true });
+      // 시료수량이 정해졌다면 시료1~n 번호는 빈칸인 상태로도 양식을 출력할 수 있다.
+      // 입력된 시료번호의 형식·제조번호 범위 오류와 수동 시료수량 오류는 계속 검증한다.
+      const errors = trRandomValidationErrors();
       if (errors.length) {
         alert("랜덤발취 내용을 확인해 주세요.\n\n- " + errors.slice(0, 20).join("\n- ") + (errors.length > 20 ? `\n... 외 ${errors.length - 20}건` : ""));
         goTRStep("trRandom");
