@@ -3994,7 +3994,24 @@
     }
     function normalizeSpaces(s) { return String(s || "").trim().replace(/\s+/g, " "); }
 
+    function clearExcelGridInteractionState() {
+      document.removeEventListener("mousemove", trFillHandleMove);
+      document.removeEventListener("mouseup", trFillHandleUp);
+      trFillDrag = null;
+      trGridState.forEach(state => {
+        state.dragging = false;
+        state.pending = null;
+        state.dragMoved = false;
+        state.selected = [];
+      });
+      document.querySelectorAll(".xl-cell-selected").forEach(cell => cell.classList.remove("xl-cell-selected"));
+      trFillClearPreview();
+      if (trFillHandleEl) trFillHandleEl.style.display = "none";
+      trGridActive = null;
+    }
+
     function showScreen(name) {
+      clearExcelGridInteractionState();
       el.screenMain.style.display = (name === "main") ? "block" : "none";
       // TR 전선 전용 프로그램: 사용 중지된 품목 화면은 어떤 경로에서도 열지 않는다.
       if (el.screenPole) el.screenPole.style.display = "none";
@@ -7850,6 +7867,41 @@
       },
     ];
 
+    function trPeriodicSheetsForMaterial(materialName = activeTRMaterial) {
+      return isFRCNCOMaterial(materialName) ? FR_PERIODIC_SHEETS : TR_ANNUAL_SHEETS;
+    }
+
+    function trPeriodicStateKeys(materialName = activeTRMaterial) {
+      const text = new Set();
+      const photos = new Set();
+      trPeriodicSheetsForMaterial(materialName).forEach(sheet => {
+        if (sheet.text) text.add(sheet.id);
+        if (sheet.photos) photos.add(sheet.id);
+        if (sheet.dielectric) {
+          [0, 1, 2].forEach(index => photos.add(`${sheet.id}:${index}`));
+        }
+      });
+      return { text, photos };
+    }
+
+    function trAnnualTextForMaterial(source, materialName = activeTRMaterial) {
+      const allowed = trPeriodicStateKeys(materialName).text;
+      const filtered = {};
+      Object.entries(source && typeof source === "object" ? source : {}).forEach(([key, value]) => {
+        if (allowed.has(key)) filtered[key] = String(value ?? "");
+      });
+      return filtered;
+    }
+
+    function trAnnualPhotosForMaterial(source, materialName = activeTRMaterial) {
+      const allowed = trPeriodicStateKeys(materialName).photos;
+      const filtered = {};
+      Object.entries(source && typeof source === "object" ? source : {}).forEach(([key, value]) => {
+        if (allowed.has(key)) filtered[key] = trSafeImageList(value);
+      });
+      return filtered;
+    }
+
     const trAnnualText = {};
     const trAnnualPhotos = {};
     let trAnnualActive = 0;
@@ -7874,7 +7926,7 @@
     }
 
     function trActivePeriodicSheets(materialName = activeTRMaterial) {
-      const source = isFRCNCOMaterial(materialName) ? FR_PERIODIC_SHEETS : TR_ANNUAL_SHEETS;
+      const source = trPeriodicSheetsForMaterial(materialName);
       return source.filter(sheet => {
         const pattern = sheet.pattern || "A";
         return trPhysicalSampleInfo(pattern, { askLowDrum: false }).status === "ok";
@@ -12496,7 +12548,7 @@
         physical1: trPhysical1ValuesForSave(),
         physical2: { ...trPhysical2Values },
         volume_remote_test: trVolumeRemoteTest,
-        annual: { visible: trAnnualVisible(), text: { ...trAnnualText } },
+        annual: { visible: trAnnualVisible(), text: trAnnualTextForMaterial(trAnnualText, b.itemName) },
         random: {
           start: trRandomState.start || "",
           end: trRandomState.end || "",
@@ -12505,7 +12557,7 @@
         },
         photos: {
           step7: trScrapeStep7Photos(),
-          annual: JSON.parse(JSON.stringify(trAnnualPhotos || {})),
+          annual: trAnnualPhotosForMaterial(trAnnualPhotos, b.itemName),
           certificates: JSON.parse(JSON.stringify(trCertificatePhotos || {})),
         },
         // 미완성 자료가 자동으로 "시험 합격" 판정되는 것을 방지한다.
@@ -12609,9 +12661,14 @@
           throw new Error("CV QIR의 필수 데이터 구조가 올바르지 않습니다.");
         }
       } else if (kind === "tr") {
-        if (!TR_MATERIAL_CONFIG[qir.material] || typeof qir.item_detail !== "string"
+        const materialConfig = TR_MATERIAL_CONFIG[qir.material];
+        const itemDetail = qir.item_detail;
+        const draftWithoutSpec = isTRDraftQIR(qir) && itemDetail === "";
+        const validMaterialSpec = !!materialConfig && typeof itemDetail === "string"
+          && (draftWithoutSpec || materialConfig.specs.includes(itemDetail));
+        if (!validMaterialSpec
           || !isObject(qir.structure) || !isObject(qir.electrical) || !isObject(qir.photos)) {
-          throw new Error("TR QIR의 필수 데이터 구조가 올바르지 않습니다.");
+          throw new Error("TR QIR의 품목·규격 조합 또는 필수 데이터 구조가 올바르지 않습니다.");
         }
       } else if (kind === "pole") {
         if (qir.material !== "콘크리트전주" || !(qir.maker == null || isObject(qir.maker)) || !isObject(qir.attendants)
@@ -12719,15 +12776,10 @@
       Object.assign(trPhysical2Values, qir.physical2 || {});
       trVolumeRemoteTest = !!qir.volume_remote_test;
       Object.keys(trAnnualText).forEach(k => delete trAnnualText[k]);
-      Object.assign(trAnnualText, qir.annual?.text || {});
+      Object.assign(trAnnualText, trAnnualTextForMaterial(qir.annual?.text || {}, materialFromFile));
       // 사진 복원 (시험사진 + 연1회 사진)
       Object.keys(trAnnualPhotos).forEach(k => delete trAnnualPhotos[k]);
-      const loadedAnnualPhotos = qir.photos?.annual;
-      if (loadedAnnualPhotos && typeof loadedAnnualPhotos === "object") {
-        Object.entries(loadedAnnualPhotos).forEach(([key, value]) => {
-          trAnnualPhotos[key] = trSafeImageList(value);
-        });
-      }
+      Object.assign(trAnnualPhotos, trAnnualPhotosForMaterial(qir.photos?.annual || {}, materialFromFile));
       trApplyStep7Photos(qir.photos?.step7 || []);
       trApplyCertificatePhotos(qir.photos?.certificates || {});
 
