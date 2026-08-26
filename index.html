@@ -7790,29 +7790,61 @@
         <text x="204" y="151" text-anchor="middle" font-family="Malgun Gothic, sans-serif" font-size="10" fill="#444">시험 구간</text>
       </svg>`;
 
+    // TR CNCE-W / TR CNCE-W/AL 공통 연1회 시험항목.
     const TR_ANNUAL_SHEETS = [
       {
-        id: "flameSheath", title: "난연성(시스)", text: true, photos: true,
-        method: "ES-6145-0019의 8.4.6항에 따라 ES-6145-0028의 3.4.7항의 (2) 방법으로 시스의 난연성을 시험한다. 불꽃이 상부 케이블의 Tray 전체 높이까지 연소하지 않는지 확인한다.",
-        frMethod: "ES-6145-0019의 7.3.4.6항에 따라 ES-6145-0028의 3.4.7항의 (2) 방법으로 시스의 난연성을 시험한다.\n불꽃이 상부 케이블의 Tray 전체 높이까지 연소하지 않는지 확인한다.",
+        id: "insulationSemiInspectionAnnual", title: "절연층 및 반도전층 검사", text: true, photos: true, pattern: "A",
+        method: "절연층 이물질 검사는 케이블의 연속압출 조장의 양단에서 길이 약 5 cm의 시료를 취하여 절연층의 이물질을 확인한다. 반도전층 검사는 절연층과 반도전층의 계면을 현미경으로 관찰하여 보이드 및 돌기의 크기를 측정하고 구매규격서의 기준에 적합한지 확인한다.",
       },
       {
-        id: "smokeDensitySheath", title: "연기밀도(시스)", text: true, photos: true,
-        method: "ES-6145-0019의 8.4.11항에 따라 ES-6145-0028의 3.4.7항의 (7) 방법으로 연기밀도를 시험한다. 빛투과율이 60% 이상인지 확인한다.",
-        frMethod: "ES-6145-0019의 7.3.4.11항에 따라 ES-6145-0028의 3.4.7항의 (7) 방법으로 연기밀도를 시험한다. 빛투과율이 60% 이상인지 확인한다.",
+        id: "inhomogeneity", title: "불균일도 측정", text: true, photos: true, pattern: "A",
+        method: "케이블 절연층 및 반도전층의 불균일도를 측정하여 구매규격서의 기준에 적합한지 확인한다.",
       },
       {
-        id: "volumeResistivity", title: "반도전층 체적저항률", volume: true, photos: true, frCycle: "분기시험",
+        id: "volumeResistivity", title: "반도전층 체적저항", volume: true, photos: true, pattern: "B",
+        method: "케이블의 내부 도체 및 절연체 반도전층의 체적저항률은 적당한 길이로 케이블을 잘라 시험을 실시한다. 내부 반도전층은 케이블을 반으로 잘라 사용하며, 외부 반도전층은 외피층 및 중성선 도체 등을 제거한 상태로 측정을 한다. 시험방법은 IEC 60502-2의 18.2.10항에 따라 실시하며, 해당 규격의 기준치에 만족해야 한다. 시험은 정상 동작 시 최대 도체온도의 ±2℃ 이내의 온도에서 실시하며, 예열된 오븐에 넣고 6시간이 경과한 후에 측정한다.",
+      },
+      {
+        id: "dielectricTemperature", title: "유전정접 온도특성", text: true, dielectric: true, pattern: "A",
+        method: "상온, 90℃ 및 130℃에서 유전정접을 측정하여 구매규격서의 기준에 적합한지 확인한다.",
+      },
+      {
+        id: "acBreakdown", title: "교류파괴", text: true, photos: true, pattern: "A",
+        method: "교류 전압을 인가하여 123 kV 이하에서 절연 파괴가 발생하지 않는지 확인한다.",
+      },
+      {
+        id: "neutralWater", title: "중성선 수밀", text: true, photos: true, pattern: "A",
+        method: "IEC 60502-2의 19.24항에 따르며, 시험방법 및 판정은 해당 규격의 부속서 F에 따른다.",
+        methodFigure: TR_NEUTRAL_WATER_METHOD_FIGURE,
+      },
+      {
+        id: "conductorWater", title: "도체 수밀", text: true, photos: true, pattern: "A",
+        method: "완제품 케이블의 시료에서 외피, 중성선 및 부풀음 테이프를 제거한 후 절연된 상태의 시료에 0.5기압의 수압을 24시간 가하여 타단으로부터의 누수 유무를 조사한다. 단, 물은 육안으로 식별 가능한 색을 갖는다.",
+        methodFigure: TR_CONDUCTOR_WATER_METHOD_FIGURE,
+      },
+    ];
+
+    // FR CNCO-W 전용 주기시험 항목.
+    const FR_PERIODIC_SHEETS = [
+      {
+        id: "flameSheath", title: "난연성(시스)", text: true, photos: true, pattern: "A",
+        method: "ES-6145-0019의 7.3.4.6항에 따라 ES-6145-0028의 3.4.7항의 (2) 방법으로 시스의 난연성을 시험한다.\n불꽃이 상부 케이블의 Tray 전체 높이까지 연소하지 않는지 확인한다.",
+      },
+      {
+        id: "smokeDensitySheath", title: "연기밀도(시스)", text: true, photos: true, pattern: "A",
+        method: "ES-6145-0019의 7.3.4.11항에 따라 ES-6145-0028의 3.4.7항의 (7) 방법으로 연기밀도를 시험한다. 빛투과율이 60% 이상인지 확인한다.",
+      },
+      {
+        id: "volumeResistivity", title: "반도전층 체적저항률", volume: true, photos: true, pattern: "B", frCycle: "분기시험",
         method: "케이블의 내부 도체 및 절연체 반도전층의 체적저항률은 적당한 길이로 케이블을 잘라 시험을 실시한다. 내부 반도전층은 케이블을 반으로 잘라 사용하며, 외부 반도전층은 외피층 및 중성선 도체 등을 제거한 상태로 측정을 한다. 시험방법은 IEC 60502-2의 18.2.10항에 따라 실시하며, 해당 규격의 기준치에 만족해야 한다. 시험은 정상 동작 시 최대 도체온도의 ±2℃이내의 온도에서 실시하며, 예열된 오븐에 넣고 6시간이 경과한 후에 측정한다.",
-        frMethod: "케이블의 내부 도체 및 절연체 반도전층의 체적저항률은 적당한 길이로 케이블을 잘라 시험을 실시한다.\n내부 반도전층은 케이블을 반으로 잘라 사용하며, 외부 반도전층은 외피층 및 중성선 도체 등을 제거한 상태로 측정을 한다.\n시험방법은 IEC 60502-2의 18.2.10항에 따라 실시하며, 해당 규격의 기준치에 만족해야 한다.\n시험은 정상 동작 시 최대 도체온도의 ±2℃이내의 온도에서 실시하며, 예열된 오븐에 넣고 6시간이 경과한 후에 측정한다.",
       },
       {
-        id: "conductorWater", title: "도체수밀", text: true, photos: true,
+        id: "conductorWater", title: "도체 수밀", text: true, photos: true, pattern: "A",
         method: "완제품 케이블의 시료를 외피,중성선 및 부풀음 테이프를 제거한 후 절연된 상태의 시료를 0.5기압의 수압 인가 가능한장치를 사용하여 24시간 가하여 타단으로 부터의 누수유무를 조사한다. 단, 물은 육안으로 식별이 가능한 색을 갖는다.",
         methodFigure: TR_CONDUCTOR_WATER_METHOD_FIGURE,
       },
       {
-        id: "neutralWater", title: "중성선 수밀", text: true, photos: true,
+        id: "neutralWater", title: "중성선 수밀", text: true, photos: true, pattern: "A",
         method: "IEC 60502-2의 19.24항에 따르며, 시험방법 및 판정은 해당규격의 부속서 F에 따른다.",
         methodFigure: TR_NEUTRAL_WATER_METHOD_FIGURE,
       },
@@ -7842,8 +7874,9 @@
     }
 
     function trActivePeriodicSheets(materialName = activeTRMaterial) {
-      return TR_ANNUAL_SHEETS.filter(sheet => {
-        const pattern = sheet.id === "volumeResistivity" ? "B" : "A";
+      const source = isFRCNCOMaterial(materialName) ? FR_PERIODIC_SHEETS : TR_ANNUAL_SHEETS;
+      return source.filter(sheet => {
+        const pattern = sheet.pattern || "A";
         return trPhysicalSampleInfo(pattern, { askLowDrum: false }).status === "ok";
       });
     }
