@@ -1060,6 +1060,12 @@
       background: rgba(255, 255, 255, .72);
     }
 
+    .tr-electric-table tfoot th,
+    .tr-electric-table tfoot td {
+      background: rgba(191, 219, 254, .62);
+      font-weight: 900;
+    }
+
     .tr-electric-table input,
     .tr-electric-table select {
       width: 100%;
@@ -5160,6 +5166,25 @@
       return Number.isFinite(drumQty) && drumQty > 0 ? Math.ceil(drumQty) : 0;
     }
 
+    function trElectricalLengthTotal(values) {
+      const total = Array.from(values || []).reduce((sum, value) => {
+        const raw = String(value ?? "").replace(/,/g, "").trim();
+        const number = Number(raw);
+        return raw !== "" && Number.isFinite(number) ? sum + number : sum;
+      }, 0);
+      return Number(total.toFixed(6));
+    }
+
+    function trElectricalLengthTotalText(total) {
+      return trCommafy(Number(total || 0).toString());
+    }
+
+    function trElectricalLengthTotalFromStore(spec, rowCount = getTRElectricalDrumCount()) {
+      const store = trElectricalValues[spec] || {};
+      const values = Array.from({ length: rowCount }, (_, index) => store[`${index + 1}:B`]);
+      return trElectricalLengthTotal(values);
+    }
+
     function trElectricalInputAllowed(info) {
       return info ? Number.isFinite(info.value) && info.value > 0 : true;
     }
@@ -6100,6 +6125,11 @@
           output.value = "";
         }
       });
+      const lengthTotalOutput = container.querySelector("[data-tr-elec-length-total]");
+      if (lengthTotalOutput) {
+        const lengthValues = Array.from(container.querySelectorAll('[data-tr-elec-col="B"]'), input => input.value);
+        lengthTotalOutput.textContent = trElectricalLengthTotalText(trElectricalLengthTotal(lengthValues));
+      }
       recalcTRElectricalValidation();
       trUpdateElectricalRandomGlow();
     }
@@ -6370,6 +6400,13 @@
             <tbody>
               ${renderTRElectricalRows(spec, drumCount, sampleInfoMap)}
             </tbody>
+            <tfoot>
+              <tr>
+                <th>조장 합계</th>
+                <td data-tr-elec-length-total>0</td>
+                <td colspan="${showImpulse ? 9 : 8}"></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       `;
@@ -7911,18 +7948,26 @@
       { id: "spark", title: "스파크 내전압 확인서", defaultSlots: 1 },
       { id: "components", title: "사용부품 확인서", defaultSlots: 2 },
       { id: "residualGas", title: "잔사가스 배출 확인서", defaultSlots: 1 },
+      { id: "compoundForeignMatter", title: "절연체용 컴파운드 이물질 검사 확인서", defaultSlots: 2, annualOnly: true },
       { id: "qualityAssurance", title: "품질보증 확인서", defaultSlots: 1, exemptOnly: true },
     ];
-    const trCertificatePhotos = { spark: [], components: [], residualGas: [], qualityAssurance: [] };
-    const trCertificateSlotCounts = { spark: 1, components: 2, residualGas: 1, qualityAssurance: 1 };
+    const trCertificatePhotos = { spark: [], components: [], residualGas: [], compoundForeignMatter: [], qualityAssurance: [] };
+    const trCertificateSlotCounts = { spark: 1, components: 2, residualGas: 1, compoundForeignMatter: 2, qualityAssurance: 1 };
     let trCertificateActive = 0;
 
     function trIsInspectionExempt() {
       return (el.trInspectionType?.value || "") === "시험면제";
     }
 
+    function trIsAnnualInspection() {
+      return (el.trInspectionType?.value || "") === "연1회";
+    }
+
     function trVisibleCertificateTypes() {
-      return TR_CERTIFICATE_TYPES.filter(type => !type.exemptOnly || trIsInspectionExempt());
+      return TR_CERTIFICATE_TYPES.filter(type =>
+        (!type.exemptOnly || trIsInspectionExempt())
+        && (!type.annualOnly || trIsAnnualInspection())
+      );
     }
 
     function trActivePeriodicSheets(materialName = activeTRMaterial) {
@@ -11628,6 +11673,7 @@
       trPruneTRElectricalState(spec, sampleInfoMap);
       const cnt = trReportElecRowCount(spec);
       const store = trElectricalValues[spec] || {};
+      const lengthTotalText = trElectricalLengthTotalText(trElectricalLengthTotalFromStore(spec, cnt));
       const cell = (rowNo, col) => store[`${rowNo}:${col}`] || "";
       const reportCell = (rowNo, col) => {
         const info = trElectricalInfoForCol(col, sampleInfoMap);
@@ -11673,6 +11719,9 @@
       return Array.from({ length: totalPages }, (_, pageIndex) => {
         const rowsHtml = rows.slice(pageIndex * rowsPerPage, (pageIndex + 1) * rowsPerPage).join("");
         const pageLabel = totalPages > 1 ? ` (${pageIndex + 1}/${totalPages})` : "";
+        const totalRowHtml = pageIndex === totalPages - 1
+          ? `<tr class="tr-elec-total-row"><td>조장 합계</td><td>${trEsc(lengthTotalText)}</td><td colspan="${showImpulse ? 9 : 8}"></td></tr>`
+          : "";
         return `
         <section class="tr-report-page tr-electrical-page">
           <div class="tr-rpt-sub">전기적 특성시험 DATA${pageLabel}</div>
@@ -11699,7 +11748,7 @@
               </tr>
               <tr><th>측정치</th><th>환산치</th></tr>
             </thead>
-            <tbody>${rowsHtml}</tbody>
+            <tbody>${rowsHtml}${totalRowHtml}</tbody>
           </table>
         </section>`;
       }).join("");
@@ -12093,6 +12142,7 @@
             .tr-elec-tbl th, .tr-elec-tbl td { font-size:10.5px; padding:3px; }
             .tr-elec-tbl th { font-size:10px; padding:0 3px; line-height:1.1; }
             .tr-elec-tbl tbody td { height:22px; }
+            .tr-elec-tbl .tr-elec-total-row td { background:#eef2f7; font-weight:900; }
             /* 물리1·2 시험데이터 표: 행 높이 크게·균일 (자동맞춤 스크립트로 1페이지 내 축소) */
             .tr-phys1-tbl td { height:30px; }
             .tr-phys1-tbl td:last-child { white-space:nowrap; }
@@ -12435,6 +12485,27 @@
       setTRReportCompletion(true);
       alert("완료 처리되었습니다.\n출력(성적서) 또는 저장(QIR)을 진행하실 수 있습니다.");
     }
+
+    function ensureTRDeliveryQuantityMatches() {
+      const deliveryRaw = trStripComma(el.trQty?.value || "").trim();
+      const deliveryQuantity = Number(deliveryRaw);
+      const spec = el.trItemDetail?.value || "";
+      const lengthTotal = trElectricalLengthTotalFromStore(spec, getTRElectricalDrumCount());
+      if (!Number.isFinite(deliveryQuantity)) return true;
+
+      const difference = Number(Math.abs(deliveryQuantity - lengthTotal).toFixed(6));
+      if (difference === 0) return true;
+
+      alert(
+        "납품수량과 전기특성의 조장 합계가 일치하지 않습니다.\n\n"
+        + `기본정보 납품수량: ${trElectricalLengthTotalText(deliveryQuantity)} m\n`
+        + `전기특성 조장 합계: ${trElectricalLengthTotalText(lengthTotal)} m\n`
+        + `차이: ${trElectricalLengthTotalText(difference)} m\n\n`
+        + "기본정보 또는 전기특성의 조장 값을 확인한 후 다시 출력해 주세요."
+      );
+      return false;
+    }
+
     function printTRReport() {
       trReportSyncState();
       if (!ensureTRReportReady()) return;
@@ -12446,6 +12517,7 @@
         alert("다음 항목이 미입력되어 출력할 수 없습니다.\n\n- " + shown.join("\n- ") + extra);
         return;
       }
+      if (!ensureTRDeliveryQuantityMatches()) return;
       const html = trReportBuildHtml();
       openPrintWindow(html);
     }
@@ -12807,6 +12879,7 @@
         alert("다음 항목이 미입력되어 출력할 수 없습니다.\n\n- " + shown.join("\n- ") + extra);
         return;
       }
+      if (!ensureTRDeliveryQuantityMatches()) return;
       openPrintWindow(trReportBuildHtml());
     }
 
