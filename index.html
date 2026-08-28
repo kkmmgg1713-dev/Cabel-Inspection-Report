@@ -1036,6 +1036,10 @@
       color: var(--text);
     }
 
+    .tr-electric-table.tr-electric-table-fr {
+      min-width: 1120px;
+    }
+
     .tr-electric-table th,
     .tr-electric-table td {
       border-right: 1px solid rgba(148, 163, 184, .35);
@@ -5348,7 +5352,7 @@
       }
       const savedValue = trElectricalValue(spec, rowNo, "L");
       const savedText = trElectricalValue(spec, rowNo, "L_text");
-      const options = ["양호", "불량", "기타"];
+      const options = ["양호", "불량", "공인기관 의뢰", "기타"];
       const selectedValue = options.includes(savedValue) || savedValue === "" ? savedValue : "기타";
       const customValue = savedText || (!options.includes(savedValue) && savedValue ? savedValue : "");
       const optionHtml = [`<option value="">선택</option>`]
@@ -6337,13 +6341,13 @@
       el.trElectricalContainer.dataset.spec = spec;
       el.trElectricalContainer.innerHTML = `
         <div class="tr-electric-table-wrap">
-          <table class="tr-electric-table">
+          <table class="tr-electric-table${showImpulse ? " tr-electric-table-fr" : ""}">
             <colgroup>
               <col style="width:9%;">
               <col style="width:9%;">
               <col style="width:9%;">
               <col style="width:10%;">
-              ${showImpulse ? '<col style="width:10%;">' : ""}
+              ${showImpulse ? '<col style="width:15%;">' : ""}
               <col style="width:10%;">
               <col style="width:10%;">
               <col style="width:17%;">
@@ -11006,7 +11010,28 @@
       return { text: "-", bad: false };
     }
     function trReportVoltageResult(spec) { return trReportJudgementResult(spec, "E"); }
-    function trReportImpulseResult(spec) { return trReportJudgementResult(spec, "L"); }
+    function trReportImpulseResult(spec) {
+      const store = trElectricalValues[spec] || {};
+      let any = false;
+      let bad = false;
+      let external = false;
+      Object.keys(store).forEach(key => {
+        const [rowNo, col] = key.split(":");
+        if (col !== "L") return;
+        const value = String(store[key] || "").trim();
+        if (!value) return;
+        any = true;
+        if (value === "불량") bad = true;
+        const detail = value === "기타"
+          ? String(store[`${rowNo}:L_text`] || "").trim()
+          : value;
+        if (/공인기관\s*(?:시험\s*)?의뢰/.test(detail)) external = true;
+      });
+      if (bad) return { text: "불 량", bad: true, external: false };
+      if (external) return { text: "공인기관 의뢰", bad: false, external: true };
+      if (any) return { text: "만 족", bad: false, external: false };
+      return { text: "-", bad: false, external: false };
+    }
 
     // ----- 물리1 결과 헬퍼 -----
     function trReportP1Result(id, sampleNo = 1) {
@@ -11302,10 +11327,13 @@
       const vText = voltage.bad ? "불 량" : (voltage.text === "-" ? "-" : "양 호");
       const impulse = showImpulse ? trReportImpulseResult(spec) : null;
       const impulseText = impulse
-        ? frElectricalResult(impulseActive, impulse.bad ? "불 량" : (impulse.text === "-" ? "-" : "양 호"))
+        ? frElectricalResult(
+          impulseActive,
+          impulse.bad ? "불 량" : (impulse.text === "-" ? "-" : (impulse.external ? impulse.text : "양 호"))
+        )
         : "";
       const impulseRowHtml = impulse
-        ? `<tr><td>충격내전압</td><td>절연체</td><td>1.2×50㎲/정․부극성 각 10회</td><td${badIf(impulseActive && impulse.bad)}>${impulseText}</td></tr>`
+        ? `<tr><td>충격내전압</td><td>절연체</td><td>1.2×50㎲/정․부극성 각 10회</td><td${badIf(impulseActive && impulse.bad)}>${trReportText(impulseText, "")}</td></tr>`
         : "";
 
       // 체적저항율: 전체 시료 중 가장 큰 값(상한 기준의 최악값)
@@ -11704,7 +11732,7 @@
             <td>${trReportNumberText(cell(r, "B"), "")}</td>
             <td>${trReportNumberText(cell(r, "C"), "")}</td>
             <td${eText === "불량" ? ' class="tr-rpt-bad"' : ""}>${trReportText(eText, "")}</td>
-            ${showImpulse ? `<td${lText === "불량" ? ' class="tr-rpt-bad"' : ""}>${trReportText(lText, "")}</td>` : ""}
+            ${showImpulse ? `<td class="tr-rpt-impulse-cell${lText === "불량" ? " tr-rpt-bad" : ""}">${trReportText(lText, "")}</td>` : ""}
             <td>${trEsc(fText)}</td>
             <td${b2(badG)}>${trEsc(gText)}</td>
             <td${b2(badH)}>${trReportNumberText(reportCell(r, "H"), "")}</td>
@@ -11729,8 +11757,8 @@
           <table class="tr-data-tbl tr-elec-tbl">
             <colgroup>
               <col style="width:7%"><col style="width:9%"><col style="width:6%"><col style="width:9%">
-              ${showImpulse ? '<col style="width:9%">' : ""}
-              <col style="width:9%"><col style="width:9%"><col style="width:20%">
+              ${showImpulse ? '<col style="width:14%">' : ""}
+              <col style="width:9%"><col style="width:9%"><col style="width:17%">
               <col style="width:11%"><col style="width:8%"><col style="width:8%">
             </colgroup>
             <thead>
@@ -12142,6 +12170,7 @@
             .tr-elec-tbl th, .tr-elec-tbl td { font-size:10.5px; padding:3px; }
             .tr-elec-tbl th { font-size:10px; padding:0 3px; line-height:1.1; }
             .tr-elec-tbl tbody td { height:22px; }
+            .tr-elec-tbl .tr-rpt-impulse-cell { white-space:normal; word-break:keep-all; line-height:1.2; }
             .tr-elec-tbl .tr-elec-total-row td { background:#eef2f7; font-weight:900; }
             /* 물리1·2 시험데이터 표: 행 높이 크게·균일 (자동맞춤 스크립트로 1페이지 내 축소) */
             .tr-phys1-tbl td { height:30px; }
