@@ -3289,6 +3289,7 @@
                   <button class="btn secondary" id="btnTRSaveQIR" disabled>최종저장(QIR)</button>
                 </div>
               </div>
+              <div class="toast" id="trPhotoProcessingStatus" role="status" style="display:none;"></div>
               <div class="toast" id="trFinishStatus">작성 중에는 "중간저장(QIR)"을 사용할 수 있습니다. 모든 입력을 마친 뒤 "완료 처리"를 누르면 출력과 최종저장을 사용할 수 있습니다.</div>
             </div>
           </div>
@@ -3551,6 +3552,7 @@
                   <button class="btn secondary" id="btnCVSaveQIR" disabled>최종저장(QIR)</button>
                 </div>
               </div>
+              <div class="toast" id="cvPhotoProcessingStatus" role="status" style="display:none;"></div>
               <div class="toast" id="cvFinishStatus">작성 중에는 중간저장(QIR)을 사용할 수 있습니다. 모든 입력을 마친 뒤 완료 처리하면 출력/최종저장을 사용할 수 있습니다.</div>
             </div>
           </div>
@@ -4360,6 +4362,7 @@
 
     function resetTRStep1(materialName = activeTRMaterial) {
       if (!el.trItemName) return;
+      resetCablePhotoTasks("tr");
       setActiveTRMaterial(materialName);
       document.getElementById("trStep1")?.classList.add("active");
       document.getElementById("trStep2")?.classList.remove("active");
@@ -5264,6 +5267,101 @@
 
     function trSafeImageList(list) {
       return Array.isArray(list) ? list.map(trSafeImageSrc).filter(Boolean) : [];
+    }
+
+    // 사진이 실제 데이터에 반영되기 전에는 완료·저장·출력을 허용하지 않는다.
+    // 문서를 새로 열거나 같은 칸의 사진을 교체하면 이전 비동기 결과는 무시한다.
+    const cablePhotoTasks = {
+      tr: { generation: 0, pending: new Map(), failed: new Map() },
+      cv: { generation: 0, pending: new Map(), failed: new Map() },
+    };
+    function cablePhotosBlocked(kind) {
+      const state = cablePhotoTasks[kind];
+      return state.pending.size > 0 || state.failed.size > 0;
+    }
+    function updateCablePhotoActions(kind) {
+      const state = cablePhotoTasks[kind];
+      const blocked = cablePhotosBlocked(kind);
+      const completed = kind === "tr" ? trReportCompleted : cvReportCompleted;
+      const ids = kind === "tr"
+        ? ["btnTRFinish", "btnTRSaveDraftQIR", "btnTRSaveQIR", "btnTRPrintSummary"]
+        : ["btnCVFinish", "btnCVSaveDraftQIR", "btnCVSaveQIR", "btnCVPrintReport"];
+      ids.forEach((id, index) => {
+        const button = document.getElementById(id);
+        if (button) button.disabled = blocked || (index >= 2 && !completed);
+      });
+      const status = document.getElementById(`${kind}PhotoProcessingStatus`);
+      if (!status) return;
+      status.replaceChildren();
+      status.style.display = blocked ? "block" : "none";
+      if (state.pending.size) {
+        const progress = document.createElement("div");
+        progress.textContent = `사진 ${state.pending.size}장 처리 중입니다. 모든 사진이 반영되면 완료 처리를 할 수 있습니다.`;
+        status.appendChild(progress);
+      }
+      state.failed.forEach((label, key) => {
+        const row = document.createElement("div");
+        row.style.marginTop = "6px";
+        const message = document.createElement("span");
+        message.textContent = `${label} — 사진을 읽지 못했습니다. 다시 첨부하거나 제외해 주세요. `;
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "btn secondary";
+        remove.textContent = "실패한 사진 제외";
+        remove.addEventListener("click", () => {
+          state.failed.delete(key);
+          updateCablePhotoActions(kind);
+        });
+        row.append(message, remove);
+        status.appendChild(row);
+      });
+    }
+    function resetCablePhotoTasks(kind) {
+      const state = cablePhotoTasks[kind];
+      state.generation += 1;
+      state.pending.clear();
+      state.failed.clear();
+      updateCablePhotoActions(kind);
+    }
+    function discardCablePhotoTask(kind, key) {
+      const state = cablePhotoTasks[kind];
+      state.pending.delete(key);
+      state.failed.delete(key);
+      updateCablePhotoActions(kind);
+    }
+    function ensureCablePhotosReady(kind) {
+      if (!cablePhotosBlocked(kind)) return true;
+      updateCablePhotoActions(kind);
+      alert(cablePhotoTasks[kind].pending.size
+        ? "사진을 처리하고 있습니다. 모든 사진 처리가 끝난 후 다시 진행해 주세요."
+        : "처리에 실패한 사진이 있습니다. 다시 첨부하거나 최종 단계에서 실패한 사진을 제외해 주세요.");
+      return false;
+    }
+    function runCablePhotoTask(kind, key, file, label, apply) {
+      const state = cablePhotoTasks[kind];
+      const task = { generation: state.generation };
+      state.pending.set(key, task);
+      state.failed.delete(key);
+      if (kind === "tr") invalidateTRReportCompletion();
+      else invalidateCVCompletion();
+      updateCablePhotoActions(kind);
+      const isCurrent = () => state.generation === task.generation && state.pending.get(key) === task;
+      return trCertificateReadFile(file).then(async src => {
+        if (!isCurrent()) return;
+        const safeSrc = trSafeImageSrc(src);
+        if (!safeSrc) throw new Error("지원하지 않는 사진 형식");
+        // 압축 실패 후 원본을 읽은 경우에도 실제로 표시 가능한 사진인지 확인한다.
+        const preview = new Image();
+        preview.src = safeSrc;
+        await preview.decode();
+        if (isCurrent()) apply(safeSrc);
+      }).catch(() => {
+        if (isCurrent()) state.failed.set(key, `${label} (${file.name || "사진"})`);
+      }).finally(() => {
+        if (!isCurrent()) return;
+        state.pending.delete(key);
+        updateCablePhotoActions(kind);
+      });
     }
 
     function getTRElectricalSampleInfoMap() {
@@ -8120,21 +8218,12 @@
     function trAnnualReadFiles(key, files) {
       const arr = Array.from(files).filter(f => f.type && f.type.startsWith("image/"));
       if (!arr.length) return;
-      invalidateTRReportCompletion();
       trAnnualPhotos[key] = trAnnualPhotos[key] || [];
-      let pending = arr.length;
-      const done = () => { pending -= 1; if (pending === 0) renderTRAnnualStep6(); };
-      arr.forEach(file => {
-        // QIR 파일 용량 절감을 위해 목표 용량 이하로 자동 압축 후 저장
-        compressImageToTarget(file)
-          .then(src => { trAnnualPhotos[key].push(src); done(); })
-          .catch(() => {
-            const reader = new FileReader();
-            reader.onload = () => { trAnnualPhotos[key].push(reader.result); done(); };
-            reader.onerror = done;
-            reader.readAsDataURL(file);
-          });
-      });
+      return Promise.all(arr.map(file => runCablePhotoTask("tr",
+        `annual:${key}:${file.name}:${file.size}:${file.lastModified}`, file, "주기·연1회 시험사진", src => {
+          trAnnualPhotos[key].push(src);
+          renderTRAnnualStep6();
+        })));
     }
 
     function setupTRAnnualEvents() {
@@ -8151,7 +8240,9 @@
       });
       container.querySelectorAll("[data-tr-annual-photo-input]").forEach(input => {
         input.addEventListener("change", () => {
-          if (input.files && input.files.length) trAnnualReadFiles(input.dataset.trAnnualPhotoInput, input.files);
+          const files = Array.from(input.files || []);
+          input.value = "";
+          if (files.length) trAnnualReadFiles(input.dataset.trAnnualPhotoInput, files);
         });
       });
       container.querySelectorAll("[data-tr-annual-photo-del]").forEach(btn => {
@@ -8239,16 +8330,16 @@
       const count = trCertificateSlotCounts[typeId] || type?.defaultSlots || 1;
       trCertificatePhotos[typeId] = trCertificatePhotos[typeId] || [];
       const targets = targetIndex == null
-        ? Array.from({ length: count }, (_, index) => index).filter(index => !trCertificatePhotos[typeId]?.[index])
+        ? Array.from({ length: count }, (_, index) => index).filter(index =>
+          !trCertificatePhotos[typeId]?.[index] && !cablePhotoTasks.tr.pending.has(`certificate:${typeId}:${index}`))
         : [targetIndex];
       const jobs = valid.slice(0, targets.length).map((file, fileIndex) =>
-        trCertificateReadFile(file).then(src => { trCertificatePhotos[typeId][targets[fileIndex]] = src; })
+        runCablePhotoTask("tr", `certificate:${typeId}:${targets[fileIndex]}`, file, type?.title || "확인서", src => {
+          trCertificatePhotos[typeId][targets[fileIndex]] = src;
+          if (trCertificateCurrentType().id === typeId) renderTRCertificateStep();
+        })
       );
-      if (!jobs.length) return;
-      invalidateTRReportCompletion();
-      Promise.allSettled(jobs).then(() => {
-        if (trCertificateCurrentType().id === typeId) renderTRCertificateStep();
-      });
+      return Promise.all(jobs);
     }
 
     function setupTRCertificateEvents() {
@@ -8272,6 +8363,7 @@
         });
         del.addEventListener("click", event => {
           event.stopPropagation();
+          discardCablePhotoTask("tr", `certificate:${typeId}:${index}`);
           trCertificatePhotos[typeId][index] = "";
           invalidateTRReportCompletion();
           renderTRCertificateStep();
@@ -8331,6 +8423,7 @@
     const cvPhotos = [];
     let cvCertificatePhoto = "";
     let cvReportCompleted = false;
+    let cvRestoringQIR = false;
     const cvStructureValues = {};
     const cvRandomValues = {};
     const cvRandomMeta = { start: "", end: "" };
@@ -8599,6 +8692,7 @@
       updateCVSpecDisplay();
     }
     function saveCVStructureValues() {
+      if (cvRestoringQIR) return;
       const container = cvEl("screenCV");
       if (!container) return;
       container.querySelectorAll("[data-cv-key]").forEach(field => {
@@ -8610,7 +8704,7 @@
     }
     function cvTextInput(key, extra = "") {
       const saved = cvSavedValue(key);
-      const number = cvNumberFromValue(saved);
+      const number = key.startsWith("strandOuter") ? cvStrictNumber(saved) : cvNumberFromValue(saved);
       const display = extra.includes("data-cv-fixed2") && String(saved).trim() !== "" && Number.isFinite(number)
         ? number.toFixed(2)
         : saved;
@@ -8630,13 +8724,53 @@
       const key = String(field?.dataset?.cvKey || "");
       if (!key || key === "mark#all" || key === "appearance#all" || key.startsWith("voltage#")
         || key.startsWith("conductorShape#") || key.startsWith("direction#")) return null;
-      return { allowNegative: key.startsWith("hotSet:") };
+      return { allowNegative: key.startsWith("hotSet:"), positive: key.startsWith("strandOuter") || key.startsWith("pitch:") };
+    }
+    function cvPitchEvaluation(pitchRaw, strandOuterRaw) {
+      const pitch = cvStrictNumber(pitchRaw);
+      const strandOuter = cvStrictNumber(strandOuterRaw);
+      const pitchValid = Number.isFinite(pitch) && pitch > 0;
+      const strandValid = Number.isFinite(strandOuter) && strandOuter > 0;
+      const ratio = pitchValid && strandValid ? pitch / strandOuter : NaN;
+      const valid = Number.isFinite(ratio) && ratio > 0;
+      return { pitchValid, strandValid, valid, ratio: valid ? ratio : NaN };
+    }
+    function cvPitchEntries() {
+      const container = cvEl("cvStructureElectricalContainer");
+      if (!container) return [];
+      return Array.from(container.querySelectorAll("[data-cv-pitch-measure]")).map(pitchField => {
+        const key = pitchField.dataset.cvPitchMeasure;
+        const sample = pitchField.dataset.cvPitchSample;
+        const label = cvPitchLabelFromKey(key);
+        const strandKey = cvStrandOuterKey(label, sample);
+        const strandField = container.querySelector(`[data-cv-key="${strandKey}"]`);
+        const resultField = container.querySelector(`[data-cv-pitch-result="${key}"]`);
+        return { sample, label, pitchField, strandField, resultField, ...cvPitchEvaluation(pitchField.value, strandField?.value) };
+      });
+    }
+    function cvPitchValidationErrors({ markFields = true } = {}) {
+      // 구조검사 전체 미입력은 기존 동작을 유지하고, 입력을 시작한 경우 모든 시료를 검사한다.
+      const active = cvStructureInputState().status !== "none";
+      const errors = [];
+      cvPitchEntries().forEach(entry => {
+        const calculationError = entry.pitchValid && entry.strandValid && !entry.valid;
+        if (markFields) {
+          entry.pitchField.classList.toggle("required-highlight", active && (!entry.pitchValid || calculationError));
+          entry.strandField?.classList.toggle("required-highlight", active && (!entry.strandValid || calculationError));
+        }
+        if (!active || entry.valid) return;
+        const target = `구조검사: 시료 #${entry.sample}${entry.label ? ` (${entry.label})` : ""}`;
+        errors.push(calculationError
+          ? `${target} 피치 배수를 계산할 수 없습니다. 연선경과 피치를 확인해 주세요.`
+          : `${target} 연선경과 피치는 모두 0보다 큰 숫자로 입력해 주세요.`);
+      });
+      return errors;
     }
     function cvMeasurementValidationErrors({ markFields = true } = {}) {
       const errors = [];
       cvEl("screenCV")?.querySelectorAll("[data-cv-key]").forEach(field => {
         const rule = cvNumericFieldRule(field);
-        if (!rule) {
+        if (!rule || rule.positive) {
           return;
         }
         const raw = String(field.value || "").trim();
@@ -8648,6 +8782,7 @@
         if (invalidFormat) errors.push(`${keyLabel(field.dataset.cvKey)}: 숫자만 입력해 주세요.`);
         else if (invalidNegative) errors.push(`${keyLabel(field.dataset.cvKey)}: 음수는 입력할 수 없습니다.`);
       });
+      errors.push(...cvPitchValidationErrors({ markFields }));
       return errors;
     }
     function keyLabel(key) {
@@ -8892,19 +9027,10 @@
     function recalcCVStructureDerived() {
       const container = cvEl("cvStructureElectricalContainer");
       if (!container) return;
-      container.querySelectorAll("[data-cv-pitch-measure]").forEach(input => {
-        const key = input.dataset.cvPitchMeasure;
-        const sample = input.dataset.cvPitchSample;
-        const label = cvPitchLabelFromKey(key);
-        const strandKey = cvStrandOuterKey(label, sample);
-        const pitch = cvNumberFromValue(input.value);
-        const strandOuterField = Array.from(container.querySelectorAll("[data-cv-key]"))
-          .find(node => node.dataset.cvKey === strandKey);
-        const strandOuter = cvNumberFromValue(strandOuterField?.value ?? cvStructureValues[strandKey]);
-        const result = Array.from(container.querySelectorAll("[data-cv-pitch-result]"))
-          .find(node => node.dataset.cvPitchResult === key);
-        if (!result) return;
-        result.value = Number.isFinite(pitch) && Number.isFinite(strandOuter) && strandOuter > 0 ? `${cvFixed(pitch / strandOuter, 2)}배` : "배";
+      cvPitchEntries().forEach(entry => {
+        if (!entry.resultField) return;
+        const hasInput = String(entry.pitchField.value).trim() || String(entry.strandField?.value || "").trim();
+        entry.resultField.value = entry.valid ? `${cvFixed(entry.ratio, 2)}배` : hasInput ? "계산 불가" : "배";
       });
       container.querySelectorAll("[data-cv-six-average]").forEach(result => {
         const [rowKey, sample] = result.dataset.cvSixAverage.split("#");
@@ -8939,10 +9065,10 @@
         structure.querySelectorAll("[data-cv-pitch-measure]").forEach(field => {
           field.classList.remove("tr-physical-bad");
         });
-        structure.querySelectorAll("[data-cv-pitch-result]").forEach(field => {
-          const value = numberOf(field);
-          toggle(field, Number.isFinite(value) && value > 20);
+        cvPitchEntries().forEach(entry => {
+          toggle(entry.resultField, entry.valid && entry.ratio > 20);
         });
+        cvPitchValidationErrors();
         structure.querySelectorAll("[data-cv-six-row]").forEach(field => {
           const value = numberOf(field);
           const row = field.dataset.cvSixRow || "";
@@ -8998,7 +9124,7 @@
           const rule = cvNumericFieldRule(field);
           if (rule && String(field.value || "").trim() !== "") {
             const value = cvStrictNumber(field.value);
-            field.classList.toggle("required-highlight", !Number.isFinite(value) || (!rule.allowNegative && value < 0));
+            field.classList.toggle("required-highlight", !Number.isFinite(value) || (rule.positive ? value <= 0 : !rule.allowNegative && value < 0));
           }
           sync();
         });
@@ -9197,6 +9323,7 @@
         alert("마지막 사진 칸에 사진 또는 설명이 있습니다.\n내용을 비운 후 사진 칸을 줄여 주세요.");
         return false;
       }
+      discardCablePhotoTask("cv", `photo:${lastIndex + 1}`);
       cvPhotos.splice(lastIndex, 1);
       cvPhotoSlotCount -= 1;
       renderCVPhotoGrid();
@@ -9211,12 +9338,7 @@
       updateCVPhotoSlotButtons();
     }
     function setCVPhotoFile(index, file) {
-      compressImageToTarget(file).catch(() => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      })).then(src => {
+      return runCablePhotoTask("cv", `photo:${index}`, file, `시험사진 ${index}`, src => {
         cvPhotos[index - 1] = { ...(cvPhotos[index - 1] || {}), src };
         renderCVPhotoGrid();
       });
@@ -9235,7 +9357,9 @@
         });
         del.addEventListener("click", event => {
           event.stopPropagation();
+          discardCablePhotoTask("cv", `photo:${idx}`);
           cvPhotos[idx - 1] = { ...(cvPhotos[idx - 1] || {}), src: "" };
+          invalidateCVCompletion();
           renderCVPhotoGrid();
         });
       });
@@ -9252,7 +9376,7 @@
       const src = trSafeImageSrc(cvCertificatePhoto);
       container.innerHTML = `
         <div style="max-width:720px;margin:0 auto;">
-          <div style="font-weight:800;text-align:center;margin-bottom:8px;">품질보증 확인서 (선택)</div>
+          <div style="font-weight:800;text-align:center;margin-bottom:8px;">품질보증 확인서</div>
           <div class="cv-certificate-photo" style="min-height:420px;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid var(--line);border-radius:10px;background:rgba(148,163,184,.08);cursor:pointer;">
             <span style="display:${src ? "none" : "block"};color:var(--muted);">품질보증 확인서 사진 1장 불러오기</span>
             <img src="${trAttr(src)}" alt="품질보증 확인서" style="display:${src ? "block" : "none"};width:100%;height:100%;max-height:720px;object-fit:contain;background:#fff;" />
@@ -9266,16 +9390,16 @@
       cell?.addEventListener("click", event => { if (event.target !== del) input?.click(); });
       input?.addEventListener("change", () => {
         const file = input.files?.[0];
+        input.value = "";
         if (!file) return;
-        compressImageToTarget(file).catch(() => new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        })).then(srcValue => { cvCertificatePhoto = srcValue; invalidateCVCompletion(); renderCVCertificate(); });
+        runCablePhotoTask("cv", "certificate", file, "품질보증 확인서", src => {
+          cvCertificatePhoto = src;
+          renderCVCertificate();
+        });
       });
       del?.addEventListener("click", event => {
         event.stopPropagation();
+        discardCablePhotoTask("cv", "certificate");
         cvCertificatePhoto = "";
         invalidateCVCompletion();
         renderCVCertificate();
@@ -9442,6 +9566,11 @@
       if (stepId === "cvRandom") renderCVRandom();
     }
     function resetCVStep1() {
+      resetCablePhotoTasks("cv");
+      ["cvStructureElectricalContainer", "cvElectricalContainer", "cvHotSetContainer",
+        "cvRandomContainer", "cvPhotoGridContainer", "cvCertificateContainer"].forEach(id => {
+        cvEl(id)?.replaceChildren();
+      });
       setupCVSelects();
       cvPhotoSlotCount = CV_MIN_PHOTO_SLOTS;
       cvPhotos.length = 0;
@@ -9546,8 +9675,14 @@
         empty,
       };
     }
-    function getCVDataMissing() {
+    function refreshCVReportTables() {
       saveCVStructureValues();
+      renderCVStructureElectrical();
+      renderCVElectrical();
+      renderCVHotSet();
+    }
+    function getCVDataMissing() {
+      refreshCVReportTables();
       const missing = [];
       const filled = value => String(value ?? "").trim() !== "";
       if (!filled(cvRandomMeta.start)) missing.push("랜덤발취: 제조 시작번호");
@@ -9571,12 +9706,13 @@
       return missing;
     }
     function setCVReportCompletion(completed, message = "") {
-      cvReportCompleted = !!completed;
+      cvReportCompleted = !!completed && !cablePhotosBlocked("cv") && !cvPitchValidationErrors({ markFields: false }).length;
       if (cvEl("btnCVPrintReport")) cvEl("btnCVPrintReport").disabled = !cvReportCompleted;
       if (cvEl("btnCVSaveQIR")) cvEl("btnCVSaveQIR").disabled = !cvReportCompleted;
       if (cvEl("cvFinishStatus")) cvEl("cvFinishStatus").textContent = message || (cvReportCompleted
         ? '완료 처리되었습니다. "출력하기(성적서)" 또는 "최종저장(QIR)"을 진행할 수 있습니다.'
         : "작성 중에는 중간저장(QIR)을 사용할 수 있습니다. 모든 입력을 마친 뒤 완료 처리하면 출력/최종저장을 사용할 수 있습니다.");
+      updateCablePhotoActions("cv");
     }
     function invalidateCVCompletion() {
       if (cvReportCompleted) setCVReportCompletion(false, "입력값이 변경되어 완료 상태가 해제되었습니다. 다시 완료 처리해 주세요.");
@@ -9585,11 +9721,12 @@
       if (!ensureCVStep1Ready()) return false;
       const missing = getCVDataMissing();
       if (!missing.length) return true;
-      alert(`다음 항목이 미입력되어 ${action}할 수 없습니다.\n\n- ${missing.slice(0, 30).join("\n- ")}${missing.length > 30 ? `\n... 외 ${missing.length - 30}건` : ""}`);
+      alert(`다음 항목에 미입력 또는 입력 오류가 있어 ${action}할 수 없습니다.\n\n- ${missing.slice(0, 30).join("\n- ")}${missing.length > 30 ? `\n... 외 ${missing.length - 30}건` : ""}`);
       return false;
     }
     function finishCVReport() {
-      if (!cvShowMissing("완료 처리")) return;
+      if (!ensureCablePhotosReady("cv")) return;
+      if (!cvShowMissing("완료 처리")) { setCVReportCompletion(false); return; }
       setCVReportCompletion(true);
       alert("CV 완료 처리되었습니다.\n출력(성적서) 또는 최종저장(QIR)을 진행할 수 있습니다.");
     }
@@ -9634,8 +9771,13 @@
       link.download = safe(`[${statusText}]_${maker}_${lotNo}_${itemName}_${core}_${area}_${inspectionType}_${testDate}${timestamp}.txt`);
       document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(link.href);
     }
-    function saveCVDraftQIR() { downloadCVQIR(buildCVQIRObject({ documentStatus: "draft" })); alert("CV 중간저장(QIR) 완료"); }
+    function saveCVDraftQIR() {
+      if (!ensureCablePhotosReady("cv")) return;
+      downloadCVQIR(buildCVQIRObject({ documentStatus: "draft" }));
+      alert("CV 중간저장(QIR) 완료");
+    }
     function saveCVFinalQIR() {
+      if (!ensureCablePhotosReady("cv")) return;
       if (!cvReportCompleted) { alert("완료 처리를 먼저 해 주세요."); return; }
       if (!cvShowMissing("최종저장")) { setCVReportCompletion(false); return; }
       downloadCVQIR(buildCVQIRObject({ documentStatus: "complete" })); alert("CV 최종저장(QIR) 완료");
@@ -9865,25 +10007,16 @@
       return Math.round(value * 100) < Math.round(minimum * 100);
     }
     function cvReportPitchRatios() {
-      return Object.entries(cvStructureValues)
-        .filter(([key, value]) => key.startsWith("pitch:") && String(value ?? "").trim() !== "")
-        .map(([key, raw]) => {
-          const sample = key.split("#").at(-1);
-          const label = cvPitchLabelFromKey(key);
-          const pitch = cvNumberFromValue(raw);
-          const strandOuter = cvNumberFromValue(cvStructureValues[cvStrandOuterKey(label, sample)]);
-          return Number.isFinite(pitch) && Number.isFinite(strandOuter) && strandOuter > 0
-            ? Math.round((pitch / strandOuter) * 100) / 100
-            : NaN;
-        })
-        .filter(Number.isFinite);
+      if (cvStructureInputState().status === "none") return [];
+      // 계산 불가 시료를 제거하지 않아, 보고서에서도 정상 시료로 간주하지 않는다.
+      return cvPitchEntries().map(entry => entry.ratio);
     }
     function cvReportStructureFail() {
       const c = cvCurrentCriteria();
       if (c.missing) return false;
       if (cvStructureValues["appearance#all"] === "불량") return true;
       if (Object.entries(cvStructureValues).some(([key, value]) => key.startsWith("conductorShape#") && value === "불량")) return true;
-      if (cvReportPitchRatios().some(value => value > 20)) return true;
+      if (cvReportPitchRatios().some(value => !Number.isFinite(value) || value > 20)) return true;
       const insulationGroups = {};
       Object.entries(cvStructureValues).forEach(([key, raw]) => {
         if (!key.startsWith("insulationThickness:")) return;
@@ -9927,7 +10060,8 @@
       return min === max ? format(min) : `${format(min)} ~ ${format(max)}`;
     }
     function cvReportBuildHtml({ only = "all" } = {}) {
-      saveCVStructureValues();
+      // 랜덤발취를 마지막에 입력/변경해도 최신 번호를 출력 표에 반영한다.
+      refreshCVReportTables();
       updateCVTestHighlights();
       const b = cvReportBasic();
       const c = cvCurrentCriteria();
@@ -10047,6 +10181,7 @@
       })();<\/script></body></html>`;
     }
     function printCVReport() {
+      if (!ensureCablePhotosReady("cv")) return;
       if (!cvReportCompleted) { alert("완료 처리를 먼저 해 주세요."); return; }
       if (!cvShowMissing("출력")) { setCVReportCompletion(false); return; }
       openPrintWindow(cvReportBuildHtml());
@@ -10054,6 +10189,12 @@
     function printCVStructureReport() {
       if (!ensureCVStep1Ready()) return;
       renderCVStructureElectrical();
+      const pitchErrors = cvPitchValidationErrors();
+      if (pitchErrors.length) {
+        setCVReportCompletion(false);
+        alert("피치 입력 오류로 출력할 수 없습니다.\n\n- " + pitchErrors.join("\n- "));
+        return;
+      }
       openPrintWindow(cvReportBuildHtml({ only: "structure" }));
     }
 
@@ -10409,6 +10550,11 @@
       if (!rnd) return "";
       // 화학분석 항목은 시료 전체를 "7, 17" 형태로 합쳐 표시
       if (!isFRCNCOMaterial() && TR_DM_COMBINE_ITEMS.has(rnd)) return trRandomAllSamples(rnd);
+      // TR 절연압출공정: 수기로 시료 1개를 지정하면 재시험의 두 결과가 같은 D/M을 사용한다.
+      // 수량 2개 중 번호 하나가 빠진 경우에는 이 규칙을 적용하지 않는다.
+      if (!isFRCNCOMaterial() && rnd === "extrusion" && Number(trRandomState.qty[rnd]) === 1) {
+        return trRandomSampleValue(rnd, 1);
+      }
       return trRandomSampleValue(rnd, sampleNo);
     }
     // 전기특성: 랜덤발취 시료(=드럼 No.)와 일치하는 행의 해당 시험 입력칸을 반짝이게
@@ -12274,7 +12420,7 @@
 
     // ----- 완료 처리 / 검증 -----
     function setTRReportCompletion(completed, statusText) {
-      trReportCompleted = !!completed;
+      trReportCompleted = !!completed && !cablePhotosBlocked("tr");
       const printBtn = document.getElementById("btnTRPrintSummary");
       const saveBtn = document.getElementById("btnTRSaveQIR");
       if (printBtn) printBtn.disabled = !trReportCompleted;
@@ -12285,6 +12431,7 @@
           ? `완료 처리되었습니다.\n"출력하기(성적서)" 또는 "최종저장(QIR)"을 진행하실 수 있습니다.\n최종판정: ${trReportJudgement()}`
           : "작성 중에는 중간저장(QIR)을 사용할 수 있습니다. 모든 입력을 마친 뒤 완료 처리하면 출력/최종저장을 사용할 수 있습니다.");
       }
+      updateCablePhotoActions("tr");
     }
 
     function invalidateTRReportCompletion() {
@@ -12502,6 +12649,7 @@
     }
 
     function completeTRReport() {
+      if (!ensureCablePhotosReady("tr")) return;
       trReportSyncState();
       if (!ensureTRReportReady()) return;
       const dataMissing = getTRReportDataMissing();
@@ -12536,6 +12684,7 @@
     }
 
     function printTRReport() {
+      if (!ensureCablePhotosReady("tr")) return;
       trReportSyncState();
       if (!ensureTRReportReady()) return;
       const dataMissing = getTRReportDataMissing();
@@ -12692,6 +12841,7 @@
       URL.revokeObjectURL(a.href);
     }
     function saveTRQIR() {
+      if (!ensureCablePhotosReady("tr")) return;
       trReportSyncState();
       if (!ensureTRReportReady()) return;
       if (!trReportCompleted) {
@@ -12723,6 +12873,7 @@
     }
 
     function saveTRDraftQIR() {
+      if (!ensureCablePhotosReady("tr")) return;
       trReportSyncState();
       const obj = buildTRQIRObject({ documentStatus: "draft" });
       downloadTRQIR(obj);
@@ -12784,33 +12935,38 @@
     }
     function loadCVStateFromQIR(qir) {
       if (!isCVQIR(qir)) return;
-      resetCVStep1();
-      setupCVSelects();
-      Object.entries(qir.fields || {}).forEach(([id, value]) => {
-        const field = cvEl(id);
-        if (field) field.value = value ?? "";
-      });
-      cvRandomMeta.start = qir.random?.meta?.start || "";
-      cvRandomMeta.end = qir.random?.meta?.end || "";
-      Object.keys(cvRandomValues).forEach(key => delete cvRandomValues[key]);
-      Object.assign(cvRandomValues, qir.random?.values || {});
-      Object.keys(cvStructureValues).forEach(key => delete cvStructureValues[key]);
-      Object.assign(cvStructureValues, qir.test_values || {});
-      cvPhotos.length = 0;
-      (Array.isArray(qir.photos) ? qir.photos : []).forEach(photo => cvPhotos.push(photo || {}));
-      cvPhotoSlotCount = Math.max(CV_MIN_PHOTO_SLOTS, cvPhotos.length);
-      cvCertificatePhoto = trSafeImageSrc(qir.certificate_photo || "");
-      updateCVSpecDisplay();
-      updateCVCertificateVisibility();
-      renderCVStructureElectrical();
-      renderCVElectrical();
-      renderCVHotSet();
-      renderCVRandom();
-      renderCVPhotoGrid();
-      renderCVCertificate();
-      renderCVFinalSummary();
-      updateCVRequiredGlow();
-      setCVReportCompletion(!isTRDraftQIR(qir));
+      cvRestoringQIR = true;
+      try {
+        resetCVStep1();
+        setupCVSelects();
+        Object.entries(qir.fields || {}).forEach(([id, value]) => {
+          const field = cvEl(id);
+          if (field) field.value = value ?? "";
+        });
+        cvRandomMeta.start = qir.random?.meta?.start || "";
+        cvRandomMeta.end = qir.random?.meta?.end || "";
+        Object.keys(cvRandomValues).forEach(key => delete cvRandomValues[key]);
+        Object.assign(cvRandomValues, qir.random?.values || {});
+        Object.keys(cvStructureValues).forEach(key => delete cvStructureValues[key]);
+        Object.assign(cvStructureValues, qir.test_values || {});
+        cvPhotos.length = 0;
+        (Array.isArray(qir.photos) ? qir.photos : []).forEach(photo => cvPhotos.push(photo || {}));
+        cvPhotoSlotCount = Math.max(CV_MIN_PHOTO_SLOTS, cvPhotos.length);
+        cvCertificatePhoto = trSafeImageSrc(qir.certificate_photo || "");
+        updateCVSpecDisplay();
+        updateCVCertificateVisibility();
+        renderCVStructureElectrical();
+        renderCVElectrical();
+        renderCVHotSet();
+        renderCVRandom();
+        renderCVPhotoGrid();
+        renderCVCertificate();
+        renderCVFinalSummary();
+        updateCVRequiredGlow();
+        setCVReportCompletion(!isTRDraftQIR(qir));
+      } finally {
+        cvRestoringQIR = false;
+      }
     }
     function editCVFromQIR(qir) {
       showScreen("cv");
@@ -13038,6 +13194,7 @@
         alert("마지막 사진 칸에 사진 또는 설명이 있습니다.\n내용을 비운 후 사진 칸을 줄여 주세요.");
         return false;
       }
+      discardCablePhotoTask("tr", `photo:${trPhotoSlotCount}`);
       wrap?.remove();
       trPhotoSlotCount -= 1;
       trScrapeStep7Photos();
@@ -13057,26 +13214,22 @@
     }
 
     function handleTRPhotoFile(file, cell) {
-      const apply = (src) => {
-        const img = cell.querySelector(".tr-photo-img");
-        const span = cell.querySelector("span");
-        const delBtn = cell.querySelector(".tr-btn-del-photo");
+      const index = Number(cell.dataset.idx);
+      return runCablePhotoTask("tr", `photo:${index}`, file, `시험사진 ${index}`, src => {
+        const currentCell = getTRPhotoGridEl()?.querySelector(`.tr-photo-cell[data-idx="${index}"]`);
+        if (!currentCell) throw new Error("사진 칸이 없습니다.");
+        const img = currentCell.querySelector(".tr-photo-img");
+        const span = currentCell.querySelector("span");
+        const delBtn = currentCell.querySelector(".tr-btn-del-photo");
         img.src = src;
         img.style.display = "block";
         span.style.display = "none";
         delBtn.style.display = "block";
-        invalidateTRReportCompletion();
-      };
-      compressImageToTarget(file)
-        .then(apply)
-        .catch(() => {
-          const reader = new FileReader();
-          reader.onload = (e) => apply(e.target.result);
-          reader.readAsDataURL(file);
-        });
+      });
     }
 
     function resetTRPhotoCell(cell) {
+      discardCablePhotoTask("tr", `photo:${cell.dataset.idx}`);
       const img = cell.querySelector(".tr-photo-img");
       const span = cell.querySelector("span");
       const delBtn = cell.querySelector(".tr-btn-del-photo");
