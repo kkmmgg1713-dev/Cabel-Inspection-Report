@@ -2007,8 +2007,9 @@
 
     .summary-row .label {
       color: var(--muted);
-      width: 70px;
+      width: 84px;
       flex-shrink: 0;
+      white-space: nowrap;
     }
 
     .summary-row .value {
@@ -2964,7 +2965,7 @@
             <div class="card" style="padding:12px;">
               <h4>📋 Step 1) 기본 정보</h4>
               <div class="summary-row">
-                <span class="label">로트 번호</span>
+                <span class="label" id="trSummaryLotLabel">로트 번호</span>
                 <span class="value" id="trSummaryLotNo">-</span>
               </div>
               <div class="summary-row">
@@ -3323,7 +3324,7 @@
             <div class="card" style="padding:12px;">
               <h4>📋 Step 1) 기본 정보</h4>
               <div class="summary-row">
-                <span class="label">로트 번호</span>
+                <span class="label" id="cvSummaryLotLabel">로트 번호</span>
                 <span class="value" id="cvSummaryLotNo">-</span>
               </div>
               <div class="summary-row">
@@ -3542,6 +3543,8 @@
             <div class="card" style="background:rgba(11,18,32,.25);">
               <h3>Step7 최종</h3>
               <div class="mini">모든 입력을 확인한 뒤 완료 처리하고 성적서를 출력하거나 QIR로 저장합니다.</div>
+              <div class="divider"></div>
+              <div id="cvFinalSummary"></div>
               <div class="divider"></div>
               <div class="row" style="justify-content:space-between;">
                 <button class="btn nav-btn" id="btnCVFinalBack"><span class="arrow-outline"></span> 이전</button>
@@ -3777,12 +3780,14 @@
       { name: "TR CNCE-W", cat: "전선", keywords: ["TR", "CNCE-W", "CNCE", "전선", "케이블"] },
       { name: "FR CNCO-W", cat: "전선", keywords: ["FR", "CNCO-W", "CNCO", "전선", "케이블"] },
       { name: "TR CNCE-W/AL", cat: "전선", keywords: ["TR", "CNCE-W/AL", "CNCE", "AL", "알루미늄", "전선", "케이블"] },
+      { name: "FR CNCO-W/AL", cat: "전선", keywords: ["FR", "CNCO-W/AL", "CNCO", "AL", "알루미늄", "난연", "전선", "케이블"] },
       { name: "CV", cat: "전선", keywords: ["CV", "전선", "케이블"] },
     ];
     const TR_MATERIAL_CONFIG = {
       "TR CNCE-W": { specs: ["60mm2", "200mm2", "325mm2", "600mm2"], testBasis: "ES-6145-0025" },
       "FR CNCO-W": { specs: ["60mm2", "200mm2", "325mm2", "600mm2"], testBasis: "ES-6145-0019" },
       "TR CNCE-W/AL": { specs: ["95mm2", "240mm2", "400mm2"], testBasis: "ES-6145-0026" },
+      "FR CNCO-W/AL": { specs: ["95mm2", "240mm2", "400mm2"], testBasis: "ES-6145-0034" },
     };
     let activeTRMaterial = "TR CNCE-W";
     let trFRAcceptedSamplingState = null;
@@ -4309,12 +4314,14 @@
     }
 
     function updateTRSummaryPanel() {
+      const summaryLotLabel = document.getElementById("trSummaryLotLabel");
       const summaryLotNo = document.getElementById("trSummaryLotNo");
       const summaryMaker = document.getElementById("trSummaryMaker");
       const summaryItemSpec = document.getElementById("trSummaryItemSpec");
       const summaryQty = document.getElementById("trSummaryQty");
       const summaryTestDate = document.getElementById("trSummaryTestDate");
 
+      if (summaryLotLabel) summaryLotLabel.textContent = trIsInspectionExempt() ? "검사요청번호" : "로트 번호";
       if (summaryLotNo) summaryLotNo.textContent = el.trLotNo?.value.trim() || "-";
       if (summaryMaker) summaryMaker.textContent = el.trMakerPick?.value.trim() || "-";
       if (summaryItemSpec) {
@@ -4552,6 +4559,54 @@
       },
     };
 
+    // FR CNCO-W/AL 전용 구조 기준 (ES-6145-0034 표 4·표 5).
+    // 도체·절연체·반도전층·중성선은 TR CNCE-W/AL과 같고, 외피 두께와 케이블 외경만 다르다.
+    // 표 5가 최소·최대를 모두 규정하므로 FR CNCO-W와 달리 TR 계열과 같은 16행 구성을 쓴다.
+    const FR_CNCO_AL_STRUCTURE_CRITERIA = {
+      "95mm2": {
+        cableOuterMax: 40.6, cableOuterStd: 37.6,
+        sheathMax: 2.67, sheathMin: 1.78,
+        neutralDirection: "Z 또는 S-Z",
+        neutralCount: 18, neutralWireNominal: 1.20, neutralWireMin: 1.17, neutralWireMax: 1.23, neutralAreaMin: 19.60, neutralAreaMinDisplay: "19.60",
+        externalSemiOuterMin: 25.97, externalSemiOuterMinDisplay: "25.97",
+        insulationOuterMax: 26.74, insulationOuterMin: 24.44,
+        externalSemiThicknessMax: 1.52, externalSemiThicknessMin: 0.76,
+        insulationThicknessMax: 7.37, insulationThicknessMin: 6.22,
+        internalSemiThicknessMin: 0.30, internalSemiThicknessMinDisplay: "0.30",
+        neutralPressedDepthMax: 0.38,
+        conductorOuterNominal: 11.4, conductorOuterMin: 11.2, conductorOuterMax: 11.6,
+        conductorDirection: "최외층 S-꼬임",
+      },
+      "240mm2": {
+        cableOuterMax: 51.4, cableOuterStd: 48.4,
+        sheathMax: 3.81, sheathMin: 2.54,
+        neutralDirection: "Z 또는 S-Z",
+        neutralCount: 16, neutralWireNominal: 2.00, neutralWireMin: 1.97, neutralWireMax: 2.03, neutralAreaMin: 49.00, neutralAreaMinDisplay: "49.00",
+        externalSemiOuterMin: 33.60, externalSemiOuterMinDisplay: "33.60",
+        insulationOuterMax: 33.92, insulationOuterMin: 31.56,
+        externalSemiThicknessMax: 1.91, externalSemiThicknessMin: 1.02,
+        insulationThicknessMax: 7.37, insulationThicknessMin: 6.22,
+        internalSemiThicknessMin: 0.41,
+        neutralPressedDepthMax: 0.38,
+        conductorOuterNominal: 18.3, conductorOuterMin: 18.0, conductorOuterMax: 18.6,
+        conductorDirection: "최외층 S-꼬임",
+      },
+      "400mm2": {
+        cableOuterMax: 56.5, cableOuterStd: 53.5,
+        sheathMax: 3.81, sheathMin: 2.54,
+        neutralDirection: "Z 또는 S-Z",
+        neutralCount: 26, neutralWireNominal: 2.00, neutralWireMin: 1.97, neutralWireMax: 2.03, neutralAreaMin: 80.36, neutralAreaMinDisplay: "80.36",
+        externalSemiOuterMin: 38.70, externalSemiOuterMinDisplay: "38.70",
+        insulationOuterMax: 39.07, insulationOuterMin: 36.66,
+        externalSemiThicknessMax: 1.91, externalSemiThicknessMin: 1.02,
+        insulationThicknessMax: 7.37, insulationThicknessMin: 6.22,
+        internalSemiThicknessMin: 0.51,
+        neutralPressedDepthMax: 0.38,
+        conductorOuterNominal: 23.2, conductorOuterMin: 22.9, conductorOuterMax: 23.5,
+        conductorDirection: "최외층 S-꼬임",
+      },
+    };
+
     // FR CNCO-W 전용 구조 기준 (ES-6145-0019 / 승인된 규격별 검토안).
     // 기존 TR CNCE-W·TR CNCE-W/AL 기준과 구조 화면/입력/출력 로직은 변경하지 않는다.
     const FR_CNCO_STRUCTURE_CRITERIA = {
@@ -4614,9 +4669,9 @@
     };
 
     function getTRStructureCriteria(spec = el.trItemDetail?.value || "", materialName = activeTRMaterial) {
-      return materialName === "FR CNCO-W"
-        ? FR_CNCO_STRUCTURE_CRITERIA[spec]
-        : TR_STRUCTURE_CRITERIA[spec];
+      if (isFRCNCOWMaterial(materialName)) return FR_CNCO_STRUCTURE_CRITERIA[spec];
+      if (materialName === "FR CNCO-W/AL") return FR_CNCO_AL_STRUCTURE_CRITERIA[spec];
+      return TR_STRUCTURE_CRITERIA[spec];
     }
 
     function trStructureCriterionDisplay(s, key) {
@@ -4667,7 +4722,7 @@
 
     const FR_CNCO_STRUCTURE_EXCLUDED_ROW_IDS = new Set(["externalSemiOuter", "neutralPressedDepth"]);
     function getTRStructureTableRows(materialName = activeTRMaterial) {
-      return materialName === "FR CNCO-W"
+      return isFRCNCOWMaterial(materialName)
         ? TR_STRUCTURE_TABLE_ROWS.filter(row => !FR_CNCO_STRUCTURE_EXCLUDED_ROW_IDS.has(row.id))
         : TR_STRUCTURE_TABLE_ROWS;
     }
@@ -4676,7 +4731,7 @@
       return parts[0] === "bae" ? parts[1] : parts[0];
     }
     function trRemoveFRExcludedStructureValues(materialName = activeTRMaterial) {
-      if (materialName !== "FR CNCO-W") return;
+      if (!isFRCNCOWMaterial(materialName)) return;
       Object.keys(trStructureValues).forEach(key => {
         if (FR_CNCO_STRUCTURE_EXCLUDED_ROW_IDS.has(trStructureValueRowId(key))) delete trStructureValues[key];
       });
@@ -4684,7 +4739,7 @@
     function trStructureValuesForSave(materialName = activeTRMaterial) {
       saveTRStructureState();
       const values = { ...trStructureValues };
-      if (materialName === "FR CNCO-W") {
+      if (isFRCNCOWMaterial(materialName)) {
         Object.keys(values).forEach(key => {
           if (FR_CNCO_STRUCTURE_EXCLUDED_ROW_IDS.has(trStructureValueRowId(key))) delete values[key];
         });
@@ -4839,14 +4894,29 @@
       delete el.trDrumQty.dataset.lowDrumNotice;
     }
 
+    // FR 계열: 물리적특성·주기시험·랜덤발취 항목 구성이 같은 난연 품목.
+    const FR_CNCO_MATERIALS = new Set(["FR CNCO-W", "FR CNCO-W/AL"]);
     function isFRCNCOMaterial(materialName = activeTRMaterial) {
+      return FR_CNCO_MATERIALS.has(materialName);
+    }
+    // FR CNCO-W(ES-6145-0019) 전용 규정. FR CNCO-W/AL(ES-6145-0034)은 아래 항목에서 TR 계열과 같다.
+    //   구조검사   : FR CNCO-W만 외부반도전층 외경·중성선 눌린 깊이를 제외하고 최대치 판정이 없다.
+    //   전기특성   : FR CNCO-W만 충격내전압을 시험하고 계약저항을 325㎟에서만 쓴다.
+    //   시료수     : FR CNCO-W만 3드럼 이하 생략 항목이 없다.
+    function isFRCNCOWMaterial(materialName = activeTRMaterial) {
       return materialName === "FR CNCO-W";
+    }
+
+    // 직류 최대 도체저항의 3드럼 이하 생략 여부. FR CNCO-W/AL만 ES-6145-0034 표 6 (주2)에
+    // 생략 규정이 있고, TR CNCE-W·TR CNCE-W/AL·FR CNCO-W는 드럼수량과 무관하게 측정한다.
+    function trConductorLowDrumOmittable(materialName = activeTRMaterial) {
+      return materialName === "FR CNCO-W/AL";
     }
 
     function getTRLowDrumOmitChoice({ ask = false } = {}) {
       if (!el.trDrumQty) return false;
-      // FR CNCO-W는 3드럼 이하에서도 생략 항목이 없다.
-      if (isFRCNCOMaterial()) {
+      // FR CNCO-W는 3드럼 이하에서도 생략 항목이 없다. (FR CNCO-W/AL은 ES-6145-0034 표 6 주2·주3에 따라 생략한다.)
+      if (isFRCNCOWMaterial()) {
         resetTRLowDrumOmitChoice();
         return false;
       }
@@ -4996,7 +5066,7 @@
         else if (isBCD && (type === "일반" || type === "분기" || type === "반기" || type === "연1회")) base = 1;
       }
       if (base <= 0) return { status: "na", count: 0 };
-      if (!isFRCNCOMaterial() && pattern === "C" && drum <= 3 && getTRLowDrumOmitChoice({ ask: askLowDrum })) return { status: "omit", count: 0 };
+      if (!isFRCNCOWMaterial() && pattern === "C" && drum <= 3 && getTRLowDrumOmitChoice({ ask: askLowDrum })) return { status: "omit", count: 0 };
       return { status: "ok", count: applyTRRetestCount(base) };
     }
 
@@ -5007,7 +5077,7 @@
       if (!Number.isFinite(drumQty) || drumQty <= 0) return { label: "-", value: null };
       if (!grade) return { label: "품질등급 선택 필요", value: null };
       if (isTRSamplingSkippedByType(grade, inspectionType)) return { label: "해당 없음", value: null };
-      if (!isFRCNCOMaterial() && lowDrumOmit && drumQty <= 3 && getTRLowDrumOmitChoice({ ask: true })) return { label: "생략", value: 0 };
+      if (!isFRCNCOWMaterial() && lowDrumOmit && drumQty <= 3 && getTRLowDrumOmitChoice({ ask: true })) return { label: "생략", value: 0 };
 
       const divisor = (grade === "S" || grade === "A") ? 30 : 15;
       const value = applyTRRetestCount(Math.max(1, Math.ceil(drumQty / divisor)));
@@ -5023,13 +5093,13 @@
       if (isTRSamplingSkippedByType(grade, inspectionType)) return { label: "해당 없음", value: null };
 
       if ((grade === "S" || grade === "A") && (inspectionType === "반기" || inspectionType === "연1회")) {
-        if (!isFRCNCOMaterial() && drumQty <= 3 && getTRLowDrumOmitChoice({ ask: true })) return { label: "생략", value: 0 };
+        if (!isFRCNCOWMaterial() && drumQty <= 3 && getTRLowDrumOmitChoice({ ask: true })) return { label: "생략", value: 0 };
         const value = applyTRRetestCount(1);
         return { label: `${value}개`, value };
       }
       if ((grade === "B" || grade === "C" || grade === "D")
         && (inspectionType === "일반" || inspectionType === "분기" || inspectionType === "반기" || inspectionType === "연1회")) {
-        if (!isFRCNCOMaterial() && drumQty <= 3 && getTRLowDrumOmitChoice({ ask: true })) return { label: "생략", value: 0 };
+        if (!isFRCNCOWMaterial() && drumQty <= 3 && getTRLowDrumOmitChoice({ ask: true })) return { label: "생략", value: 0 };
         const value = applyTRRetestCount(1);
         return { label: `${value}개`, value };
       }
@@ -5041,7 +5111,7 @@
     }
 
     function notifyTRLowDrumQty() {
-      if (isFRCNCOMaterial()) {
+      if (isFRCNCOWMaterial()) {
         resetTRLowDrumOmitChoice();
         return;
       }
@@ -5133,21 +5203,22 @@
       "600mm2": { insulationMin: 1500, conductorMax: 0.0308, capacitanceMax: 0.47 },
     };
 
+    // FR CNCO-W/AL의 저항·정전용량 기준은 ES-6145-0028 표 1의 Al 항목이고, TR CNCE-W/AL과 값이 같다.
     function getTRElectricalCriteria(spec = el.trItemDetail?.value || "", materialName = activeTRMaterial) {
-      return materialName === "FR CNCO-W"
+      return isFRCNCOWMaterial(materialName)
         ? FR_CNCO_ELECTRICAL_CRITERIA[spec]
         : TR_ELECTRICAL_CRITERIA[spec];
     }
 
     function getTRElectricalLimits(spec = el.trItemDetail?.value || "", materialName = activeTRMaterial) {
-      return materialName === "FR CNCO-W"
+      return isFRCNCOWMaterial(materialName)
         ? FR_CNCO_ELECTRICAL_LIMITS[spec]
         : TR_ELECTRICAL_LIMITS[spec];
     }
 
-    // FR CNCO-W는 325mm²에서만 계약저항을 사용한다. 다른 품목은 기존 동작 유지.
+    // FR CNCO-W는 325mm²에서만 계약저항을 사용한다. 다른 품목(FR CNCO-W/AL 포함)은 기존 동작 유지.
     function trElectricalContractApplicable(spec = el.trItemDetail?.value || "", materialName = activeTRMaterial) {
-      return materialName !== "FR CNCO-W" || spec === "325mm2";
+      return !isFRCNCOWMaterial(materialName) || spec === "325mm2";
     }
 
     function trElectricalContractValue(spec, materialName = activeTRMaterial) {
@@ -5366,7 +5437,7 @@
 
     function getTRElectricalSampleInfoMap() {
       const proportional = getTRProportionalSampleInfo({ lowDrumOmit: true });
-      const conductor = getTRProportionalSampleInfo({ lowDrumOmit: false });
+      const conductor = getTRProportionalSampleInfo({ lowDrumOmit: trConductorLowDrumOmittable() });
       const single = getTRSingleElectricalSampleInfo();
       const infoMap = {
         F: { ...single, name: "절연저항" },
@@ -5375,7 +5446,7 @@
         J: { ...proportional, name: "부분방전" },
         K: { ...single, name: "유전정접" },
       };
-      if (isFRCNCOMaterial()) infoMap.L = { ...single, name: "충격내전압" };
+      if (isFRCNCOWMaterial()) infoMap.L = { ...single, name: "충격내전압" };
       return infoMap;
     }
 
@@ -5468,7 +5539,7 @@
     }
 
     function renderTRElectricalRows(spec, count, sampleInfoMap) {
-      const showImpulse = isFRCNCOMaterial();
+      const showImpulse = isFRCNCOWMaterial();
       if (!count) {
         return `<tr><td class="tr-electric-empty-row" colspan="${showImpulse ? 11 : 10}">Step1에서 드럼수량(D/M)을 입력하면 데이터 입력 행이 생성됩니다.</td></tr>`;
       }
@@ -6291,7 +6362,7 @@
         .filter(input => !input.disabled && !input.readOnly && !input.hidden);
       const rowNumber = input => Number(input.dataset.trElecRow) || 0;
       const byRow = list => list.sort((a, b) => rowNumber(a) - rowNumber(b));
-      const cols = isFRCNCOMaterial() ? ["A", "B", "C", "E", "L", "F", "H", "I", "J", "K"] : ["A", "B", "C", "E", "F", "H", "I", "J", "K"];
+      const cols = isFRCNCOWMaterial() ? ["A", "B", "C", "E", "L", "F", "H", "I", "J", "K"] : ["A", "B", "C", "E", "F", "H", "I", "J", "K"];
       return cols.flatMap(col => {
         if (col !== "E" && col !== "L") {
           return byRow(inputs.filter(input => input.dataset.trElecCol === col));
@@ -6423,7 +6494,7 @@
 
       const drumCount = getTRElectricalDrumCount();
       const sampleInfoMap = getTRElectricalSampleInfoMap();
-      const showImpulse = isFRCNCOMaterial();
+      const showImpulse = isFRCNCOWMaterial();
       trPruneTRElectricalState(spec, sampleInfoMap);
       if (el.trElectricalSpecNote) {
         const sampleSummary = [
@@ -6528,15 +6599,21 @@
     const TR_PUBLIC_INSTITUTE_OPTIONS = ["KERI", "KTR", "KTC", "KTL", "전선조합", "기타"];
     const TR_PHYSICAL1_AGENCY_NUMBER_ROW_IDS = new Set(["dielectric90", "dielectric130", "dielectric60", "dielectricRoom", "acBreakdown"]);
 
+    // 절연압출공정 적합성 시험. TR CNCE-W·TR CNCE-W/AL·FR CNCO-W/AL이 공유한다.
+    // FR CNCO-W(ES-6145-0019)만 이 자리에 유전정접 온도특성(상온·60℃·90℃, 0.4%)을 쓴다.
+    const TR_EXTRUSION_PHYSICAL1_ROWS = [
+      { id: "dielectric90", item: "절연압출공정\n적합성 시험", sub: "유전정접\n90℃", criteria: "0.5% 이하", type: "number", pattern: "A", validMax: 0.5 },
+      { id: "dielectric130", item: "절연압출공정\n적합성 시험", sub: "유전정접\n130℃", criteria: "0.5% 이하", type: "number", pattern: "A", validMax: 0.5 },
+      { id: "dielectricRoom", item: "절연압출공정\n적합성 시험", sub: "유전정접\n상온", criteria: "0.5% 이하", type: "number", pattern: "A", validMax: 0.5 },
+      { id: "acBreakdown", item: "절연압출공정\n적합성 시험", sub: "교류\n파괴", criteria: "123kV 이하에서\n절연 파괴 없어야 함", type: "number", pattern: "A", failAtOrBelow: 123 },
+    ];
+
     const TR_PHYSICAL1_ROWS = [
       { id: "insulationSemiInspection", item: "절연층 및 반도전층 검사", sub: "", criteria: "물리적특성2 참조", type: "autoDropdown", pattern: "A" },
       { id: "semiVolumeInner", item: "반도전층\n체적저항", sub: "내도", criteria: "1,000Ω·m ↓", type: "calc", calc: "innerVolume", pattern: "B" },
       { id: "semiVolumeOuter", item: "반도전층\n체적저항", sub: "외도", criteria: "500Ω·m ↓", type: "calc", calc: "outerVolume", pattern: "B" },
       { id: "outerSemiPeel", item: "외부반도전층\n박리력 시험", sub: "", criteria: "4 ~ 45N", type: "range", pattern: "C", validMin: 4, validMax: 45 },
-      { id: "dielectric90", item: "절연압출공정\n적합성 시험", sub: "유전정접\n90℃", criteria: "0.5% 이하", type: "number", pattern: "A", validMax: 0.5 },
-      { id: "dielectric130", item: "절연압출공정\n적합성 시험", sub: "유전정접\n130℃", criteria: "0.5% 이하", type: "number", pattern: "A", validMax: 0.5 },
-      { id: "dielectricRoom", item: "절연압출공정\n적합성 시험", sub: "유전정접\n상온", criteria: "0.5% 이하", type: "number", pattern: "A", validMax: 0.5 },
-      { id: "acBreakdown", item: "절연압출공정\n적합성 시험", sub: "교류\n파괴", criteria: "123kV 이하에서\n절연 파괴 없어야 함", type: "number", pattern: "A", failAtOrBelow: 123 },
+      ...TR_EXTRUSION_PHYSICAL1_ROWS,
       { id: "neutralWater", item: "중성선 수밀", sub: "", criteria: "케이블 양단에 누수 없을 것", type: "dropdown", pattern: "A" },
       { id: "conductorWater", item: "도체 수밀", sub: "", criteria: "타 단에 누수 없을 것", type: "dropdown", pattern: "A" },
       { id: "tensileElongation", item: "인장강도 및 신율,\n신축변형", sub: "", criteria: "구매규격서 참조", type: "dropdown", pattern: "C" },
@@ -6578,8 +6655,48 @@
       { id: "environmentSmokeDensity", item: "내 환경성 시험", sub: "연기밀도(시스)", criteria: "빛투과율 60% 이상", type: "dropdown", pattern: "A", customNumericRules: [{ min: 60 }] },
     ];
 
+    // FR CNCO-W/AL(ES-6145-0034) 물리적특성1. FR CNCO-W 세트를 기준으로 표 6과 맞춘다.
+    //   제외: 가교도 시험 3항목        - 표 6·ES-6145-0028 어디에도 없다.
+    //   제외: 내 환경성 내한성·내유성  - 표 6의 내 환경성 하위는 난연성·산소지수·연소가스부식성·무독성·연기밀도 5개뿐이다.
+    //   교체: 유전정접 온도특성 3항목  - 표 6에 없다. 같은 자리에 표 6의 절연압출공정 적합성 시험을 넣는다.
+    //   주기: 절연층 및 반도전층 검사  - 표 6에서 (주4) 납품시 매년 1회이므로 pattern A로 올린다.
+    const FR_CNCO_AL_PHYSICAL1_EXCLUDED_IDS = new Set([
+      "crosslinkInner", "crosslinkFiller", "crosslinkOuter", "environmentCold", "environmentOil",
+    ]);
+    const FR_CNCO_AL_PHYSICAL1_ROWS = FR_CNCO_PHYSICAL1_ROWS.flatMap(row => {
+      if (row.id === "dielectricRoom") return TR_EXTRUSION_PHYSICAL1_ROWS;
+      if (row.id === "dielectric60" || row.id === "dielectric90") return [];
+      if (FR_CNCO_AL_PHYSICAL1_EXCLUDED_IDS.has(row.id)) return [];
+      return [row.id === "insulationSemiInspection" ? { ...row, pattern: "A" } : row];
+    });
+
     function getTRPhysical1Rows(materialName = activeTRMaterial) {
-      return materialName === "FR CNCO-W" ? FR_CNCO_PHYSICAL1_ROWS : TR_PHYSICAL1_ROWS;
+      if (materialName === "FR CNCO-W/AL") return FR_CNCO_AL_PHYSICAL1_ROWS;
+      return isFRCNCOMaterial(materialName) ? FR_CNCO_PHYSICAL1_ROWS : TR_PHYSICAL1_ROWS;
+    }
+
+    // 화학분석시험 묶음 이름. FR CNCO-W/AL은 가교도 시험이 없다.
+    function trFRAnalysisGroupLabel(materialName = activeTRMaterial) {
+      return materialName === "FR CNCO-W/AL" ? "화학분석시험" : "화학분석시험(가교도 등)";
+    }
+
+    // 내 환경성 시험 묶음에 내한성·내유성(분기)이 있는 품목인지. FR CNCO-W/AL은 없다.
+    function trFRHasColdOilRows(materialName = activeTRMaterial) {
+      return isFRCNCOMaterial(materialName) && materialName !== "FR CNCO-W/AL";
+    }
+
+    // dielectric* 행이 절연압출공정 적합성 시험(상온·90℃·130℃ 0.5% + 교류파괴)인지,
+    // FR CNCO-W처럼 유전정접 온도특성(상온·60℃·90℃ 0.4%)인지 구분한다.
+    function trUsesExtrusionPhysical1(materialName = activeTRMaterial) {
+      return !isFRCNCOWMaterial(materialName);
+    }
+
+    // 물리적특성2의 절연층 기공·이물질과 반도전층 계면 돌기 검사는 물리적특성1
+    // "절연층 및 반도전층 검사"의 판정 근거이므로 그 항목과 주기를 맞춘다.
+    // (TR 계열·FR CNCO-W/AL은 연1회, FR CNCO-W는 1회 납품당 1회)
+    function trPhysical2DefectPattern(materialName = activeTRMaterial) {
+      const row = getTRPhysical1Rows(materialName).find(item => item.id === "insulationSemiInspection");
+      return row?.pattern || "A";
     }
 
     const FR_PHYSICAL1_MANUAL_RANDOM_MAP = Object.freeze({
@@ -6597,6 +6714,21 @@
       environmentSmokeDensity: "extrusion",
     });
 
+    // FR CNCO-W/AL은 절연압출공정 적합성 시험도 내환경성시험과 같은 랜덤발취 시료를 쓴다.
+    const FR_CNCO_AL_PHYSICAL1_MANUAL_RANDOM_MAP = Object.freeze({
+      ...FR_PHYSICAL1_MANUAL_RANDOM_MAP,
+      dielectric90: "extrusion",
+      dielectric130: "extrusion",
+      dielectricRoom: "extrusion",
+      acBreakdown: "extrusion",
+    });
+
+    function trFRPhysical1ManualRandomMap(materialName = activeTRMaterial) {
+      return materialName === "FR CNCO-W/AL"
+        ? FR_CNCO_AL_PHYSICAL1_MANUAL_RANDOM_MAP
+        : FR_PHYSICAL1_MANUAL_RANDOM_MAP;
+    }
+
     function trFRManualRandomSampleCount(itemId) {
       const raw = String(trRandomState.qty[itemId] ?? "").trim();
       const count = Number(raw);
@@ -6605,15 +6737,15 @@
 
     function trPhysical1RowSampleInfo(row, { askLowDrum = true, materialName = activeTRMaterial } = {}) {
       const base = trPhysicalSampleInfo(row.pattern, { askLowDrum });
-      if (materialName !== "FR CNCO-W" || base.status !== "ok") return base;
-      const itemId = FR_PHYSICAL1_MANUAL_RANDOM_MAP[row.id];
+      if (!isFRCNCOMaterial(materialName) || base.status !== "ok") return base;
+      const itemId = trFRPhysical1ManualRandomMap(materialName)[row.id];
       if (!itemId) return base;
       const count = trFRManualRandomSampleCount(itemId);
       return count > 0 ? { status: "ok", count } : { status: "manual", count: 0 };
     }
 
     function trPhysical1GroupDisplayName(item, entries, materialName = activeTRMaterial) {
-      if (materialName !== "FR CNCO-W" || item !== "내 환경성 시험") return item;
+      if (!isFRCNCOMaterial(materialName) || item !== "내 환경성 시험") return item;
       const isApplicable = entry => entry.info.status === "ok" || entry.info.status === "manual";
       const annualActive = entries.some(entry => entry.row.pattern === "A" && isApplicable(entry));
       const coldOilActive = entries.some(entry => entry.row.pattern === "C" && isApplicable(entry));
@@ -7191,7 +7323,7 @@
         el.trPhysical2SpecNote.textContent = "시료 수량은 Step1 기준으로 자동 산출됩니다. 빈 입력칸은 판정에서 제외되며, 기준을 초과한 시험결과는 빨간 글씨로 표시됩니다.";
       }
       const volInfo = trPhysicalSampleInfo("B");
-      const defInfo = trPhysicalSampleInfo(isFRCNCOMaterial() ? "C" : "A");
+      const defInfo = trPhysicalSampleInfo(trPhysical2DefectPattern());
       const impurityRows = TR_PHYSICAL2_LIMIT_ROWS.filter(row => row.section === "절연층 기공 및 이물질, 내부반도전층 굴곡깊이 검사");
       const voidRows = TR_PHYSICAL2_LIMIT_ROWS.filter(row => row.section === "반도전층 계면 돌기 검사");
       const lockOf = info => info.status === "ok" ? "" : (info.status === "omit" ? "생략" : "미해당");
@@ -8006,8 +8138,61 @@
       },
     ];
 
+    // FR CNCO-W/AL은 시험근거가 ES-6145-0034이고, 물리적 특성 시험은 6.3.4항에서 ES-6145-0028을 인용한다.
+    const FR_AL_PERIODIC_BASE = new Map(FR_PERIODIC_SHEETS.map(sheet => [
+      sheet.id,
+      sheet.method && sheet.method.includes("ES-6145-0019")
+        ? { ...sheet, method: sheet.method.replace(/ES-6145-0019의 7\.3\.4\.\d+항/g, "ES-6145-0034의 6.3.4항") }
+        : sheet,
+    ]));
+    const frAlPeriodicBase = id => FR_AL_PERIODIC_BASE.get(id);
+
+    // FR CNCO-W/AL 주기시험. ES-6145-0034 표 6 (주4) "납품시 매년 1회 시행" 항목 전체를 담고,
+    // (주5) "매 분기 1회 이상"인 반도전층 체적저항률만 pattern B로 둔다. 순서는 표 6의 물리적 특성 시험 순서다.
+    // 시험방법은 6.3.4항(물리적 특성)과 6.3.7항(절연압출공정 적합성)이 ES-6145-0028을 인용한다.
+    const FR_AL_PERIODIC_SHEETS = [
+      frAlPeriodicBase("neutralWater"),
+      frAlPeriodicBase("conductorWater"),
+      {
+        id: "insulationSemiInspectionAnnual", title: "절연층 및 반도전층 검사", text: true, photos: true, pattern: "A",
+        method: "ES-6145-0034의 6.3.4항에 따라 ES-6145-0028의 「물리적 특성 시험」 방법으로 시험한다.\n절연층 이물질 검사는 케이블의 연속압출 조장의 양단에서 길이 약 5 cm의 시료를 취하여 절연층의 이물질을 확인한다. 반도전층 검사는 절연층과 반도전층의 계면을 현미경으로 관찰하여 보이드 및 돌기의 크기를 측정하고 구매규격서의 기준에 적합한지 확인한다.",
+      },
+      frAlPeriodicBase("volumeResistivity"),
+      {
+        id: "tensileAgingRetention", title: "인장강도 및 신율(가열노화 후 잔율)", text: true, photos: true, pattern: "A",
+        method: "ES-6145-0034의 6.3.4항에 따라 ES-6145-0028의 「물리적 특성 시험」 방법으로 시험한다.\n절연체 시료를 규정 조건으로 가열노화시킨 후 인장강도와 신율을 측정하여, 노화 전 값에 대한 잔율이 구매규격서의 기준에 적합한지 확인한다.",
+      },
+      frAlPeriodicBase("flameSheath"),
+      {
+        id: "oxygenIndexSheath", title: "산소지수(시스)", text: true, photos: true, pattern: "A",
+        method: "ES-6145-0034의 6.3.4항에 따라 ES-6145-0028의 3.4.7항의 (3) 방법으로 시스의 산소지수를 시험한다. 산소지수가 30 이상인지 확인한다.",
+      },
+      {
+        id: "corrosivitySheath", title: "연소가스부식성(시스)", text: true, photos: true, pattern: "A",
+        method: "ES-6145-0034의 6.3.4항에 따라 ES-6145-0028의 3.4.7항의 (5) 방법으로 연소가스부식성을 시험한다. pH가 4.3 이상, 전도도가 10 μs/mm 이하인지 확인한다.",
+      },
+      {
+        id: "toxicitySheath", title: "무독성(시스)", text: true, photos: true, pattern: "A",
+        method: "ES-6145-0034의 6.3.4항에 따라 ES-6145-0028의 3.4.7항의 (6) 방법으로 시스의 무독성을 시험한다. HCl 함량이 0.5 % 이하인지 확인한다.",
+      },
+      frAlPeriodicBase("smokeDensitySheath"),
+      {
+        id: "ionicImpurityAnnual", title: "반도전층내 이온성 불순물 함량", text: true, photos: true, pattern: "A",
+        method: "ES-6145-0034의 6.3.4항에 따라 ES-6145-0028의 「물리적 특성 시험」 방법으로 반도전층의 이온성 불순물 함량을 측정하고 구매규격서의 기준에 적합한지 확인한다.",
+      },
+      {
+        id: "dielectricTemperature", title: "절연압출공정 적합성시험(유전정접 온도특성)", text: true, dielectric: true, pattern: "A",
+        method: "ES-6145-0034의 6.3.7항에 따라 ES-6145-0028의 「절연압출공정 적합성시험」 방법으로 시험한다.\n상온, 90 ℃ 및 130 ℃에서 유전정접을 측정하여 각 0.5 % 이하인지 확인한다.",
+      },
+      {
+        id: "acBreakdown", title: "절연압출공정 적합성시험(교류파괴)", text: true, photos: true, pattern: "A",
+        method: "ES-6145-0034의 6.3.7항에 따라 ES-6145-0028의 「절연압출공정 적합성시험」 방법으로 시험한다.\n교류 전압을 인가하여 123 kV 이하에서 절연 파괴가 발생하지 않는지 확인한다.",
+      },
+    ];
+
     function trPeriodicSheetsForMaterial(materialName = activeTRMaterial) {
-      return isFRCNCOMaterial(materialName) ? FR_PERIODIC_SHEETS : TR_ANNUAL_SHEETS;
+      if (!isFRCNCOMaterial(materialName)) return TR_ANNUAL_SHEETS;
+      return materialName === "FR CNCO-W/AL" ? FR_AL_PERIODIC_SHEETS : FR_PERIODIC_SHEETS;
     }
 
     function trPeriodicStateKeys(materialName = activeTRMaterial) {
@@ -8065,10 +8250,16 @@
       return (el.trInspectionType?.value || "") === "연1회";
     }
 
+    // 연1회 시험항목에 딸린 확인서는 Step6 연1회시험과 함께 움직인다.
+    // 즉 시험종류가 연1회일 때와 C·D등급 반기 시험일 때 모두 나와야 한다.
+    function trAnnualCertificateVisible() {
+      return trIsAnnualInspection() || trAnnualVisible();
+    }
+
     function trVisibleCertificateTypes() {
       return TR_CERTIFICATE_TYPES.filter(type =>
         (!type.exemptOnly || trIsInspectionExempt())
-        && (!type.annualOnly || trIsAnnualInspection())
+        && (!type.annualOnly || trAnnualCertificateVisible())
       );
     }
 
@@ -8652,6 +8843,7 @@
       const drumQty = cvEl("cvDrumQty")?.value.trim();
       const startDate = cvEl("cvTestStartDate")?.value.trim();
       const endDate = cvEl("cvTestEndDate")?.value.trim();
+      if (cvEl("cvSummaryLotLabel")) cvEl("cvSummaryLotLabel").textContent = cvCertificateVisible() ? "검사요청번호" : "로트 번호";
       if (cvEl("cvSummaryLotNo")) cvEl("cvSummaryLotNo").textContent = lot;
       if (cvEl("cvSummaryMaker")) cvEl("cvSummaryMaker").textContent = maker;
       if (cvEl("cvSummaryItemSpec")) cvEl("cvSummaryItemSpec").textContent = cvSpecText();
@@ -9438,18 +9630,20 @@
         : [["appearanceVoltage", "외관검사, 교류 내전압"], ["conductor", "도체저항"], ["structure", "구조검사, HOT/SET"]];
       const maker = cvEl("cvMaker")?.value.trim() || "";
       const lot = cvEl("cvLotNo")?.value.trim() || "";
+      const lotLabel = cvCertificateVisible() ? "검사요청번호" : "로트번호";
+      const inspectionTypeText = cvCertificateVisible() ? "면제" : (cvEl("cvInspectionType")?.value || "");
       const qty = trStripComma(cvEl("cvQty")?.value || "");
       const drum = trStripComma(cvEl("cvDrumQty")?.value || "");
       const qtyText = qty && drum ? `${trCommafy(qty)}M(${trCommafy(drum)}D/M)` : qty ? `${trCommafy(qty)}M` : drum ? `${trCommafy(drum)}D/M` : "";
       const date = cvEl("cvTestStartDate")?.value || "";
       const grade = cvEl("cvQualityGrade")?.value || "";
       const witness = cvEl("cvInspectorName")?.value.trim() || "";
-      const title = `${cvSpecText()} 시험검사 시료 리스트`;
+      const title = `${cvSpecText()} 시험검사 시료 리스트${inspectionTypeText ? `(${inspectionTypeText})` : ""}`;
       const infoTable = `
         <table class="tr-random-info">
           <colgroup><col style="width:13%"><col style="width:20%"><col style="width:13%"><col style="width:21%"><col style="width:13%"><col style="width:20%"></colgroup>
           <tbody>
-            <tr><td class="rlbl">제조업체</td><td class="rval">${trEsc(maker)}</td><td class="rlbl">로트번호</td><td class="rval">${trEsc(lot)}</td><td class="rlbl" colspan="2">제조번호</td></tr>
+            <tr><td class="rlbl">제조업체</td><td class="rval">${trEsc(maker)}</td><td class="rlbl">${lotLabel}</td><td class="rval">${trEsc(lot)}</td><td class="rlbl" colspan="2">제조번호</td></tr>
             <tr><td class="rlbl">납품수량</td><td class="rval">${trEsc(qtyText)}</td><td class="rlbl">발취일</td><td class="rval">${trEsc(date)}</td><td class="rlbl">시작번호</td><td class="rval"><input class="r-num" data-cv-r-start type="number" min="0" step="1" value="${trAttr(cvRandomMeta.start)}" /></td></tr>
             <tr><td class="rlbl">품질등급</td><td class="rval">${trEsc(grade)}</td><td class="rlbl">입회자</td><td class="rval" data-cv-random-witness>${trEsc(witness)}</td><td class="rlbl">끝번호</td><td class="rval"><input class="r-num" data-cv-r-end type="number" min="0" step="1" value="${trAttr(cvRandomMeta.end)}" /></td></tr>
           </tbody>
@@ -10231,11 +10425,15 @@
     ];
 
     function trRandomItemName(item) {
-      if (activeTRMaterial === "FR CNCO-W" && item.id === "dielectric") return "유전정접, 유전정접 온도특성";
-      if (activeTRMaterial === "FR CNCO-W" && item.id === "extrusion") {
+      if (isFRCNCOMaterial() && item.id === "dielectric" && !trUsesExtrusionPhysical1()) {
+        return "유전정접, 유전정접 온도특성";
+      }
+      if (isFRCNCOMaterial() && item.id === "extrusion") {
+        // FR CNCO-W/AL은 이 시료 하나로 내환경성시험과 절연압출공정 적합성 시험을 함께 한다.
+        if (trUsesExtrusionPhysical1()) return "절연압출공정적합성, 내환경성시험";
         return trPhysicalSampleInfo("A", { askLowDrum: false }).status === "ok" ? "내환경성시험" : "내한(유) 시험";
       }
-      if (activeTRMaterial === "FR CNCO-W" && item.id === "chemical") return "화학분석시험(가교도 등)";
+      if (isFRCNCOMaterial() && item.id === "chemical") return trFRAnalysisGroupLabel();
       if (item.id !== "chemical") return item.name;
       return trPhysicalSampleInfo("A").status === "ok"
         ? "화학분석시험(외피특성 등)"
@@ -10259,8 +10457,8 @@
         }
         case "prop": {
           if (!hasBase || err) return { status: "na" };
-          const lowDrumOmittable = item.id !== "conductorR";
-          if (!isFR && lowDrumOmittable && drum <= 3 && getTRLowDrumOmitChoice({ ask: false })) return { status: "omit" };
+          const lowDrumOmittable = item.id !== "conductorR" || trConductorLowDrumOmittable();
+          if (!isFRCNCOWMaterial() && lowDrumOmittable && drum <= 3 && getTRLowDrumOmitChoice({ ask: false })) return { status: "omit" };
           const div = isSA ? 30 : 15;
           return { status: "ok", count: applyTRRetestCount(Math.max(1, Math.ceil(drum / div))) };
         }
@@ -10270,18 +10468,22 @@
           if (isSA && (type === "반기" || type === "연1회")) ok = true;
           else if (isBCD && (type === "일반" || type === "분기" || type === "반기" || type === "연1회")) ok = true;
           if (!ok) return { status: "na" };
-          if (!isFR && drum <= 3 && getTRLowDrumOmitChoice({ ask: false })) return { status: "omit" };
+          if (!isFRCNCOWMaterial() && drum <= 3 && getTRLowDrumOmitChoice({ ask: false })) return { status: "omit" };
           return { status: "ok", count: applyTRRetestCount(1) };
         }
         case "frImpulse":
-          return isFR ? trPhysicalSampleInfo("C", { askLowDrum: false }) : { status: "na" };
+          // ES-6145-0034 표 6에 충격내전압이 없어 FR CNCO-W/AL은 시료를 뽑지 않는다.
+          return isFRCNCOWMaterial() ? trPhysicalSampleInfo("C", { askLowDrum: false }) : { status: "na" };
         case "A": case "B": case "C": {
-          if (isFR && item.id === "insulSemi") return trPhysicalSampleInfo("C", { askLowDrum: false });
+          // FR CNCO-W만 절연층 및 반도전층 검사가 분기다. FR CNCO-W/AL은 표 6 (주4) 연1회.
+          if (isFRCNCOWMaterial() && item.id === "insulSemi") return trPhysicalSampleInfo("C", { askLowDrum: false });
           return trPhysicalSampleInfo(item.type, { askLowDrum: false });
         }
         case "manualA": {
           if (isFR) {
-            const coldOil = trPhysicalSampleInfo("C", { askLowDrum: false });
+            const coldOil = trFRHasColdOilRows()
+              ? trPhysicalSampleInfo("C", { askLowDrum: false })
+              : { status: "na" };
             const environment = trPhysicalSampleInfo("A", { askLowDrum: false });
             if (coldOil.status !== "ok" && environment.status !== "ok") return { status: "na" };
             return { status: "manual", count: trFRManualRandomSampleCount(item.id) };
@@ -10441,7 +10643,7 @@
       const spec = el.trItemDetail?.value || "";
       if (spec) trPruneTRElectricalState(spec, getTRElectricalSampleInfoMap());
 
-      const activePhysicalRows = new Map(FR_CNCO_PHYSICAL1_ROWS.map(row => [row.id, trPhysical1RowSampleInfo(row)]));
+      const activePhysicalRows = new Map(getTRPhysical1Rows().map(row => [row.id, trPhysical1RowSampleInfo(row)]));
       Object.keys(trPhysical1Values).forEach(key => {
         const match = key.match(/^([^#]+)#(\d+):/);
         if (!match) return;
@@ -10451,7 +10653,7 @@
       });
 
       const volumeInfo = trPhysicalSampleInfo("B");
-      const defectInfo = trPhysicalSampleInfo("C");
+      const defectInfo = trPhysicalSampleInfo(trPhysical2DefectPattern());
       const limitIds = new Set(TR_PHYSICAL2_LIMIT_ROWS.map(row => row.id));
       Object.keys(trPhysical2Values).forEach(key => {
         const match = key.match(/^([^#]+)#(\d+)$/);
@@ -10544,7 +10746,7 @@
       const groupId = trPhysical1DmGroupKey(rowId);
       let rnd = TR_PHYSICAL1_RANDOM_MAP[groupId];
       if (isFRCNCOMaterial()) {
-        if (groupId === "dielectric90") rnd = "dielectric";
+        if (groupId === "dielectric90" && !trUsesExtrusionPhysical1()) rnd = "dielectric";
         else if (rowId === "environmentCold" || rowId === "environmentOil" || rowId.startsWith("environment")) rnd = "extrusion";
       }
       if (!rnd) return "";
@@ -10722,6 +10924,8 @@
       // 상단 정보
       const maker = el.trMakerPick?.value.trim() || "";
       const lot = el.trLotNo?.value.trim() || "";
+      const lotLabel = trIsInspectionExempt() ? "검사요청번호" : "로트번호";
+      const inspectionTypeText = trIsInspectionExempt() ? "면제" : (el.trInspectionType?.value || "");
       const qtyRaw = trStripComma(el.trQty?.value || "");
       const drumRaw = trStripComma(el.trDrumQty?.value || "");
       let qtyText = "";
@@ -10730,7 +10934,10 @@
       else if (drumRaw) qtyText = `${trCommafy(drumRaw)}D/M`;
       const spec = el.trItemDetail?.value.trim() || "";
       const materialName = el.trItemName?.value || activeTRMaterial;
-      const titleText = spec ? `${materialName} ${spec} 시험검사 시료 리스트` : `${materialName} 시험검사 시료 리스트`;
+      const titleSuffix = inspectionTypeText ? `(${inspectionTypeText})` : "";
+      const titleText = spec
+        ? `${materialName} ${spec} 시험검사 시료 리스트${titleSuffix}`
+        : `${materialName} 시험검사 시료 리스트${titleSuffix}`;
       const date = el.trTestStartDate?.value.trim() || "";
       const grade = el.trQualityGrade?.value || "";
       const witness = el.trInspectorName?.value.trim() || "";
@@ -10744,7 +10951,7 @@
         <table class="tr-random-info">
           <colgroup><col style="width:13%"><col style="width:20%"><col style="width:13%"><col style="width:21%"><col style="width:13%"><col style="width:20%"></colgroup>
           <tbody>
-            <tr><td class="rlbl">제조업체</td><td class="rval">${txt(maker)}</td><td class="rlbl">로트번호</td><td class="rval">${txt(lot)}</td><td class="rlbl" colspan="2">제조번호</td></tr>
+            <tr><td class="rlbl">제조업체</td><td class="rval">${txt(maker)}</td><td class="rlbl">${lotLabel}</td><td class="rval">${txt(lot)}</td><td class="rlbl" colspan="2">제조번호</td></tr>
             <tr><td class="rlbl">납품수량</td><td class="rval">${txt(qtyText)}</td><td class="rlbl">발취일</td><td class="rval">${txt(date)}</td><td class="rlbl">시작번호</td><td class="rval">${startCell}</td></tr>
             <tr><td class="rlbl">품질등급</td><td class="rval">${txt(grade)}</td><td class="rlbl">입회자</td><td class="rval">${witnessOut}</td><td class="rlbl">끝번호</td><td class="rval">${endCell}</td></tr>
           </tbody>
@@ -10828,7 +11035,7 @@
     function trFRManualQtyHasExcessData(itemId, count) {
       const samples = trRandomState.samples[itemId] || {};
       if (Object.entries(samples).some(([key, value]) => Number(key) > count && String(value ?? "").trim() !== "")) return true;
-      const rowIds = new Set(Object.entries(FR_PHYSICAL1_MANUAL_RANDOM_MAP)
+      const rowIds = new Set(Object.entries(trFRPhysical1ManualRandomMap())
         .filter(([, randomItemId]) => randomItemId === itemId)
         .map(([rowId]) => rowId));
       return Object.entries(trPhysical1Values).some(([key, value]) => {
@@ -11010,6 +11217,12 @@
       return trEsc(s).replace(/\n/g, "<br>");
     }
 
+    // 전기특성 헤더의 도체저항·계약저항 기준은 셀 폭이 좁아 "이하)" 앞에서만 줄바꿈한다.
+    // (품목명과 저항값은 한 줄에 붙여 둔다.)
+    function trReportResistanceCriteria(value) {
+      return trEsc(String(value ?? "").replace(/\n/g, "")).replace(/\s*이하\)/g, "<br>이하)");
+    }
+
     // 시험일자 표기: YYYY-MM-DD → YYYY.MM.DD, 시작·종료 다르면 범위
     function trReportDateText() {
       const raw = d => String(d || "").trim();
@@ -11064,12 +11277,15 @@
     // 모든 시트 상단 공통 기본정보 블록 (seal=true면 시험자/입회자 뒤에 "(인)")
     function trReportHeaderHtml(b, seal = false) {
       const sealMark = v => (seal && v) ? `${v} (인)` : v;
-      const lotText = `${trReportText(b.lotNo, "")}${b.inspectionType ? `(${trEsc(b.inspectionType)})` : ""}`;
+      const isExempt = b.inspectionType === "시험면제";
+      const inspectionTypeText = isExempt ? "면제" : b.inspectionType;
+      const lotLabel = isExempt ? "검사요청<br>번호" : "로트번호";
+      const lotText = `${trReportText(b.lotNo, "")}${inspectionTypeText ? `(${trEsc(inspectionTypeText)})` : ""}`;
       return `
         <div class="tr-sum-contract">계약번호 : ${trReportText(b.contractNo, "")}</div>
         <table class="tr-sum-info">
           <tr>
-            <td class="lbl">로트번호</td><td>${lotText}</td>
+            <td class="lbl">${lotLabel}</td><td>${lotText}</td>
             <td class="lbl">시 험 자</td><td>${trReportText(sealMark(b.tester), "")}</td>
             <td class="lbl">입 회 자</td><td>${trReportText(sealMark(b.inspector), "")}</td>
           </tr>
@@ -11321,7 +11537,7 @@
       if (trReportElecIsTarget(sampleInfoMap.J) && trReportElecColValues(spec, "J", sampleInfoMap).some(v => v > TR_ELECTRICAL_PARTIAL_DISCHARGE_MAX)) return true;
       if (trReportElecIsTarget(sampleInfoMap.K) && trReportElecColValues(spec, "K", sampleInfoMap).some(v => v > TR_ELECTRICAL_DIELECTRIC_MAX)) return true;
       if (trReportVoltageResult(spec).bad) return true;
-      if (isFRCNCOMaterial() && trReportImpulseResult(spec).bad) return true;
+      if (isFRCNCOWMaterial() && trReportImpulseResult(spec).bad) return true;
       if (trReportElecIsTarget(sampleInfoMap.F) && limits) {
         const cnt = trReportElecRowCount(spec);
         for (let r = 1; r <= cnt; r++) {
@@ -11367,7 +11583,9 @@
 
     // ===== 시트 1) 종합 =====
     function trReportSparkVoltage(spec, materialName = activeTRMaterial) {
-      if (isFRCNCOMaterial(materialName)) return "10kV";
+      if (isFRCNCOWMaterial(materialName)) return "10kV";
+      // ES-6145-0034 5.5항: FR CNCO-W/AL은 95㎟만 7kV, 240·400㎟는 10kV.
+      if (materialName === "FR CNCO-W/AL") return spec === "95mm2" ? "7kV" : "10kV";
       return ["60mm2", "200mm2", "95mm2", "240mm2"].includes(spec) ? "4.5kV" : "7.0kV";
     }
 
@@ -11444,9 +11662,11 @@
       // 유전정접 온도특성 = FR은 물리1 상온/60/90, 기존 품목은 90/130/상온 데이터 최소~최대
       const dielVals = [];
       const dielTempInfo = trReportP1Info("dielectric90", b.itemName);
-      const dielectricTempRowIds = isFRSummary
-        ? ["dielectricRoom", "dielectric60", "dielectric90"]
-        : ["dielectric90", "dielectric130", "dielectricRoom"];
+      const usesExtrusionP1 = trUsesExtrusionPhysical1(b.itemName);
+      const dielectricTempMax = usesExtrusionP1 ? 0.5 : 0.4;
+      const dielectricTempRowIds = usesExtrusionP1
+        ? ["dielectric90", "dielectric130", "dielectricRoom"]
+        : ["dielectricRoom", "dielectric60", "dielectric90"];
       const dielectricTempActive = !isFRSummary || activeP1Ids(dielectricTempRowIds).length > 0;
       {
         const dn = dielTempInfo.status === "ok" ? dielTempInfo.count : 0;
@@ -11466,7 +11686,7 @@
           : dielTempInfo.status === "omit"
             ? "생략"
             : dielVals.length ? `${summaryNumber(Math.min(...dielVals), 2, 3)} ~ ${summaryNumber(Math.max(...dielVals), 2, 3)}` : "-";
-      const tempCharBad = dielVals.some(value => value > (isFRSummary ? 0.4 : 0.5));
+      const tempCharBad = dielVals.some(value => value > dielectricTempMax);
       const showDielectricTemp = showP1Group(dielectricTempRowIds);
       const badIf = cond => cond ? ' class="tr-rpt-bad"' : "";
       const voltage = trReportVoltageResult(spec);
@@ -11569,7 +11789,7 @@
         : acInfo.status === "omit"
           ? "생략"
           : acWorst != null ? `파괴지점 ${trReportNumberString(acWorst, { digits: 2 })} kV` : (acAgencies[0] || "별 첨");
-      const analysisIds = b.itemName === "FR CNCO-W"
+      const analysisIds = isFRCNCOMaterial(b.itemName)
         ? ["tensileElongation", "ionicImpurity", "crosslinkInner", "crosslinkFiller", "crosslinkOuter"]
         : ["tensileElongation", "ionicImpurity", "sheathProperty"];
       const analysis = p1GroupResult(analysisIds);
@@ -11590,11 +11810,11 @@
           : `<tr><td>도체저항 20℃ (Ω/㎞)</td><td colspan="2">${trReportNumberText(condSpec, "-")} 이하</td><td${badIf(conductorBad)}>${frElectricalResult(conductorActive, condRes)}</td></tr>`;
       const dielectricRowsHtml = showDielectric100 && showDielectricTemp
         ? `<tr><td rowspan="2">유전정접 (％)</td><td>${dielectricRegularLabel}</td><td>0.4% 이하</td><td${badIf(dielMaxV != null && dielMaxV > TR_ELECTRICAL_DIELECTRIC_MAX)}>${frElectricalResult(dielectric100Active, diel100)}</td></tr>
-           <tr><td>온도특성</td><td>${isFRSummary ? "0.4% 이하" : "0.5% 이하"}</td><td${badIf(tempCharBad)}>${tempChar}</td></tr>`
+           <tr><td>온도특성</td><td>${dielectricTempMax}% 이하</td><td${badIf(tempCharBad)}>${tempChar}</td></tr>`
         : showDielectric100
           ? `<tr><td>유전정접 (％)</td><td>${dielectricRegularLabel}</td><td>0.4% 이하</td><td${badIf(dielMaxV != null && dielMaxV > TR_ELECTRICAL_DIELECTRIC_MAX)}>${frElectricalResult(dielectric100Active, diel100)}</td></tr>`
           : showDielectricTemp
-            ? `<tr><td>유전정접 (％)</td><td>온도특성</td><td>${isFRSummary ? "0.4% 이하" : "0.5% 이하"}</td><td${badIf(tempCharBad)}>${tempChar}</td></tr>`
+            ? `<tr><td>유전정접 (％)</td><td>온도특성</td><td>${dielectricTempMax}% 이하</td><td${badIf(tempCharBad)}>${tempChar}</td></tr>`
             : "";
       const capacitanceRowHtml = showCapacitance
         ? `<tr><td>정 전 용 량 (㎌/㎞)</td><td colspan="2">${trReportNumberText(limits.capacitanceMax, "-")} 이하</td><td${badIf(limits.capacitanceMax != null && capMaxV != null && capMaxV > limits.capacitanceMax)}>${frElectricalResult(capacitanceActive, capRes)}</td></tr>`
@@ -11622,7 +11842,7 @@
         ? `<tr><td>절연층 및 반도전층 검사</td><td colspan="2">구매규격서</td><td${badIf(insulSemi.bad)}>${trReportText(insulSemi.text)}</td></tr>`
         : "";
       const analysisRowHtml = showAnalysis
-        ? `<tr><td>${isFRSummary ? "화학분석시험(가교도 등)" : "분  석  시  험"}</td><td colspan="2">구매규격서</td><td${badIf(analysis.bad)}>${trReportText(analysis.text)}</td></tr>`
+        ? `<tr><td>${isFRSummary ? trFRAnalysisGroupLabel(b.itemName) : "분  석  시  험"}</td><td colspan="2">구매규격서</td><td${badIf(analysis.bad)}>${trReportText(analysis.text)}</td></tr>`
         : "";
       const environmentRowHtml = showEnvironment
         ? `<tr><td>${environmentTitle}</td><td colspan="2">구매규격서</td><td${badIf(environment.bad)}>${trReportText(environment.text)}</td></tr>`
@@ -11840,7 +12060,7 @@
         return `<section class="tr-report-page"><div class="tr-rpt-sub">전기적 특성시험 DATA</div>${trReportHeaderHtml(b)}<p style="text-align:center;margin-top:20px;">전기특성 입력값이 없습니다.</p></section>`;
       }
       const showContract = trElectricalContractApplicable(spec, b.itemName);
-      const showImpulse = isFRCNCOMaterial(b.itemName);
+      const showImpulse = isFRCNCOWMaterial(b.itemName);
       const contract = trElectricalContractValue(spec, b.itemName);
       const conductorLimit = trElectricalConductorLimit(spec, b.itemName, contract);
       const sampleInfoMap = getTRElectricalSampleInfoMap();
@@ -11894,7 +12114,7 @@
         const rowsHtml = rows.slice(pageIndex * rowsPerPage, (pageIndex + 1) * rowsPerPage).join("");
         const pageLabel = totalPages > 1 ? ` (${pageIndex + 1}/${totalPages})` : "";
         const totalRowHtml = pageIndex === totalPages - 1
-          ? `<tr class="tr-elec-total-row"><td>조장 합계</td><td>${trEsc(lengthTotalText)}</td><td colspan="${showImpulse ? 9 : 8}"></td></tr>`
+          ? `<tr class="tr-elec-total-row"><td>조장<br>합계</td><td>${trEsc(lengthTotalText)}</td><td colspan="${showImpulse ? 9 : 8}"></td></tr>`
           : "";
         return `
         <section class="tr-report-page tr-electrical-page">
@@ -11915,7 +12135,7 @@
                 <th rowspan="2">내전압<br>(46kV/5분)</th>
                 ${showImpulse ? '<th rowspan="2">충격내전압<br>(절연체)</th>' : ""}
                 <th colspan="2">${trReportMultiline(criteria.insulation)}</th>
-                <th rowspan="2">${isFRCNCOMaterial(b.itemName) ? trReportMultiline(criteria.conductor) : trEsc(criteria.conductor.replace(/\n/g, ""))}${showContract ? `<br>계약저항(${trReportNumberText(contract, "-")}Ω/km 이하)` : ""}</th>
+                <th rowspan="2">${trReportResistanceCriteria(criteria.conductor)}${showContract ? `<br>계약저항(${trReportNumberText(contract, "-")}Ω/km<br>이하)` : ""}</th>
                 <th rowspan="2">${trReportMultiline(criteria.capacitance)}</th>
                 <th rowspan="2">부분방전<br>(10pC<br>이하)</th>
                 <th rowspan="2">유전정접<br>${showImpulse ? "(13.2kV)<br>(0.4% 이하)" : "(0.4%<br>이하)"}</th>
@@ -11974,7 +12194,7 @@
       };
 
       let rowsHtml = "";
-      const frDmLast = b.itemName === "FR CNCO-W";
+      const frDmLast = isFRCNCOMaterial(b.itemName);
       groups.forEach(group => {
         const leaves = group.leaves;
         const hasSub = leaves.some(l => l.sub);
@@ -12132,7 +12352,7 @@
           </tbody>
         </table>`;
 
-      const defInfo = trPhysicalSampleInfo(isFRCNCOMaterial() ? "C" : "A");
+      const defInfo = trPhysicalSampleInfo(trPhysical2DefectPattern(b.itemName));
       const dn = defInfo.status === "ok" ? defInfo.count : 0;
       const limitResultTotalWidth = isFRCNCOMaterial(b.itemName) ? 21.6 : 36;
       const limitCriteriaWidth = isFRCNCOMaterial(b.itemName) ? 32.4 : 18;
@@ -12548,7 +12768,7 @@
           ["F", "절연저항", cnt("insulationR")], ["H", "도체저항", cnt("conductorR")],
           ["I", "정전용량", cnt("capacitance")], ["J", "부분방전", cnt("pd")], ["K", "유전정접", cnt("dielectric")],
         ];
-        if (isFRCNCOMaterial()) colReq.push(["L", "충격내전압", cnt("impulse")]);
+        if (isFRCNCOWMaterial()) colReq.push(["L", "충격내전압", cnt("impulse")]);
         colReq.forEach(([col, name, req]) => {
           if (req <= 0) return;
           const targetInfo = colTargetInfo(col);
@@ -12572,7 +12792,7 @@
           if (store[`${r}:E`] === "기타" && !filled(store[`${r}:E_text`])) {
             push(`전기특성: ${r}행 내전압 기타 내용 미입력`);
           }
-          if (isFRCNCOMaterial() && store[`${r}:L`] === "기타" && !filled(store[`${r}:L_text`])) {
+          if (isFRCNCOWMaterial() && store[`${r}:L`] === "기타" && !filled(store[`${r}:L_text`])) {
             push(`전기특성: ${r}행 충격내전압 기타 내용 미입력`);
           }
         }
@@ -12630,7 +12850,7 @@
           if (need.some(bse => !filled(trPhysical2Value(`${bse}#${s}`)))) { push("물리적특성2: 반도전층 체적저항율 측정값"); break; }
         }
       }
-      const defInfo = trPhysicalSampleInfo(isFRCNCOMaterial() ? "C" : "A");
+      const defInfo = trPhysicalSampleInfo(trPhysical2DefectPattern());
       if (defInfo.status === "ok") {
         for (let s = 1; s <= defInfo.count; s++) {
           if (TR_PHYSICAL2_LIMIT_ROWS.some(rw => !filled(trPhysical2Value(`${rw.id}#${s}`)))) { push("물리적특성2: 절연층 기공·이물질/반도전층 계면 돌기 검사값"); break; }
@@ -15110,6 +15330,7 @@
     });
     cvEl("cvInspectionType")?.addEventListener("change", () => {
       updateCVCertificateVisibility();
+      updateCVStep1Summary();
       if (cvEl("cvStepFinal")?.classList.contains("active")) renderCVFinalSummary();
     });
     cvEl("cvQty")?.addEventListener("input", () => {
