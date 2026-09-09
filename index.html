@@ -11789,11 +11789,19 @@
         : acInfo.status === "omit"
           ? "생략"
           : acWorst != null ? `파괴지점 ${trReportNumberString(acWorst, { digits: 2 })} kV` : (acAgencies[0] || "별 첨");
-      const analysisIds = isFRCNCOMaterial(b.itemName)
-        ? ["tensileElongation", "ionicImpurity", "crosslinkInner", "crosslinkFiller", "crosslinkOuter"]
+      const chemicalIds = isFRCNCOMaterial(b.itemName)
+        ? ["tensileElongation", "ionicImpurity"]
         : ["tensileElongation", "ionicImpurity", "sheathProperty"];
+      const crosslinkIds = ["crosslinkInner", "crosslinkFiller", "crosslinkOuter"];
+      const analysisIds = isFRCNCOWMaterial(b.itemName)
+        ? chemicalIds
+        : isFRCNCOMaterial(b.itemName)
+          ? [...chemicalIds, ...crosslinkIds]
+          : chemicalIds;
       const analysis = p1GroupResult(analysisIds);
       const showAnalysis = showP1Group(analysisIds);
+      const crosslink = p1GroupResult(crosslinkIds);
+      const showCrosslink = isFRCNCOWMaterial(b.itemName) && showP1Group(crosslinkIds);
       const environmentColdIds = ["environmentCold", "environmentOil"];
       const environmentAnnualIds = [
         "environmentFlameSheath", "environmentOxygenIndex", "environmentCorrosivity", "environmentToxicity", "environmentSmokeDensity",
@@ -11842,7 +11850,10 @@
         ? `<tr><td>절연층 및 반도전층 검사</td><td colspan="2">구매규격서</td><td${badIf(insulSemi.bad)}>${trReportText(insulSemi.text)}</td></tr>`
         : "";
       const analysisRowHtml = showAnalysis
-        ? `<tr><td>${isFRSummary ? trFRAnalysisGroupLabel(b.itemName) : "분  석  시  험"}</td><td colspan="2">구매규격서</td><td${badIf(analysis.bad)}>${trReportText(analysis.text)}</td></tr>`
+        ? `<tr><td>${isFRCNCOWMaterial(b.itemName) ? "화학분석시험" : isFRSummary ? trFRAnalysisGroupLabel(b.itemName) : "분  석  시  험"}</td><td colspan="2">구매규격서</td><td${badIf(analysis.bad)}>${trReportText(analysis.text)}</td></tr>`
+        : "";
+      const crosslinkRowHtml = showCrosslink
+        ? `<tr><td>가교도</td><td colspan="2">구매규격서</td><td${badIf(crosslink.bad)}>${trReportText(crosslink.text)}</td></tr>`
         : "";
       const environmentRowHtml = showEnvironment
         ? `<tr><td>${environmentTitle}</td><td colspan="2">구매규격서</td><td${badIf(environment.bad)}>${trReportText(environment.text)}</td></tr>`
@@ -11874,6 +11885,7 @@
               ${insulSemiRowHtml}
               ${acBreakdownRowHtml}
               ${analysisRowHtml}
+              ${crosslinkRowHtml}
               ${environmentRowHtml}
               <tr class="tr-sum-result"><td colspan="3">시 험 결 과</td><td>${trReportText(trReportJudgement())}</td></tr>
             </tbody>
