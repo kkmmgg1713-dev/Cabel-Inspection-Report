@@ -1028,7 +1028,7 @@
 
     .tr-electric-table {
       width: 100%;
-      min-width: 980px;
+      min-width: 1080px;
       border-collapse: separate;
       border-spacing: 0;
       table-layout: fixed;
@@ -1037,7 +1037,7 @@
     }
 
     .tr-electric-table.tr-electric-table-fr {
-      min-width: 1120px;
+      min-width: 1220px;
     }
 
     .tr-electric-table th,
@@ -1185,8 +1185,13 @@
       gap: 4px;
     }
 
-    .tr-electric-voltage-custom[hidden] {
+    .tr-electric-voltage-custom[hidden],
+    .tr-electric-agency-display[hidden] {
       display: none;
+    }
+
+    .tr-electric-agency-display {
+      cursor: pointer;
     }
 
     .tr-electric-empty-row {
@@ -5238,6 +5243,8 @@
     }
     const TR_ELECTRICAL_PARTIAL_DISCHARGE_MAX = 10;
     const TR_ELECTRICAL_DIELECTRIC_MAX = 0.4;
+    const TR_ELEC_DIELECTRIC_MODE_NUMBER = "수치입력";
+    const TR_ELEC_DIELECTRIC_MODE_AGENCY = "공인기관의뢰";
 
     function getTRElectricalDrumCount() {
       const drumQty = Number(el.trDrumQty?.value);
@@ -5286,22 +5293,36 @@
       ["F", "H", "I", "J", "K", "L"].forEach(col => {
         const info = trElectricalInfoForCol(col, sampleInfoMap);
         const allowed = Number(info?.value);
+        const family = col === "K" ? ["K", "K_mode", "K_agency", "K_agencyCustom"] : [col];
         const keys = Object.keys(store)
-          .filter(key => key.split(":")[1] === col)
+          .filter(key => family.includes(key.split(":")[1]))
           .sort((a, b) => Number(a.split(":")[0]) - Number(b.split(":")[0]));
         if (!Number.isFinite(allowed) || allowed <= 0) {
           keys.forEach(key => delete store[key]);
           return;
         }
-        let kept = 0;
+        const rows = [];
         keys.forEach(key => {
+          const rowNo = key.split(":")[0];
+          if (!rows.includes(rowNo)) rows.push(rowNo);
+        });
+        let kept = 0;
+        rows.forEach(rowNo => {
           if (kept < allowed) kept += 1;
-          else delete store[key];
+          else family.forEach(name => delete store[`${rowNo}:${name}`]);
         });
       });
       Object.keys(store).filter(key => key.endsWith(":L_text")).forEach(key => {
         const rowNo = key.split(":")[0];
         if (store[`${rowNo}:L`] !== "기타") delete store[key];
+      });
+      Object.keys(store).filter(key => /:K_agency(?:Custom)?$/.test(key)).forEach(key => {
+        const rowNo = key.split(":")[0];
+        if (store[`${rowNo}:K_mode`] !== TR_ELEC_DIELECTRIC_MODE_AGENCY) delete store[key];
+      });
+      Object.keys(store).filter(key => key.split(":")[1] === "K").forEach(key => {
+        const rowNo = key.split(":")[0];
+        if (store[`${rowNo}:K_mode`] === TR_ELEC_DIELECTRIC_MODE_AGENCY) delete store[key];
       });
     }
 
@@ -5309,9 +5330,20 @@
       const container = el.trElectricalContainer;
       const spec = container?.dataset.spec;
       if (!container || !spec) return;
+      const prev = trElectricalValues[spec] || {};
       const next = {};
       container.querySelectorAll("[data-tr-elec-input]").forEach(input => {
         next[input.dataset.trElecInput] = input.value;
+      });
+      Object.keys(next).forEach(key => {
+        const [rowNo, col] = key.split(":");
+        if (col === "K" && next[`${rowNo}:K_mode`] === TR_ELEC_DIELECTRIC_MODE_AGENCY) delete next[key];
+        if ((col === "K_agency" || col === "K_agencyCustom") && next[`${rowNo}:K_mode`] !== TR_ELEC_DIELECTRIC_MODE_AGENCY) delete next[key];
+      });
+      Object.keys(prev).forEach(key => {
+        if (!/^\d+:K_agency(?:Custom)?$/.test(key)) return;
+        const rowNo = key.split(":")[0];
+        if (next[`${rowNo}:K_mode`] === TR_ELEC_DIELECTRIC_MODE_AGENCY && next[key] == null) next[key] = prev[key];
       });
       trElectricalValues[spec] = next;
       const contractInput = container.querySelector("[data-tr-elec-contract]");
@@ -5321,6 +5353,43 @@
 
     function trElectricalValue(spec, rowNo, col) {
       return trElectricalValues[spec]?.[`${rowNo}:${col}`] || "";
+    }
+
+    function trElectricalDielectricMode(spec, rowNo, store = trElectricalValues[spec]) {
+      const mode = String(store?.[`${rowNo}:K_mode`] ?? "").trim();
+      if (mode === TR_ELEC_DIELECTRIC_MODE_NUMBER || mode === TR_ELEC_DIELECTRIC_MODE_AGENCY) return mode;
+      if (mode === "수치 입력") return TR_ELEC_DIELECTRIC_MODE_NUMBER;
+      if (mode === "공인기관 시험의뢰" || mode === "공인기관 의뢰") return TR_ELEC_DIELECTRIC_MODE_AGENCY;
+      return String(store?.[`${rowNo}:K`] ?? "").trim() !== "" ? TR_ELEC_DIELECTRIC_MODE_NUMBER : "";
+    }
+
+    function trElectricalDielectricAgencyText(spec, rowNo, store = trElectricalValues[spec]) {
+      const agency = String(store?.[`${rowNo}:K_agency`] ?? "").trim();
+      const custom = String(store?.[`${rowNo}:K_agencyCustom`] ?? "").trim();
+      if (!agency) return "";
+      const name = agency === "기타" ? custom : agency;
+      return name ? `${TR_ELEC_DIELECTRIC_MODE_AGENCY}(${name})` : "";
+    }
+
+    function trElectricalDielectricHasEntry(spec, rowNo, store = trElectricalValues[spec]) {
+      const mode = trElectricalDielectricMode(spec, rowNo, store);
+      if (mode === TR_ELEC_DIELECTRIC_MODE_AGENCY) return !!trElectricalDielectricAgencyText(spec, rowNo, store);
+      if (mode === TR_ELEC_DIELECTRIC_MODE_NUMBER) return String(store?.[`${rowNo}:K`] ?? "").trim() !== "";
+      return false;
+    }
+
+    function clearTRElectricalDielectricRow(rowNo, spec = el.trElectricalContainer?.dataset.spec) {
+      const container = el.trElectricalContainer;
+      const numberInput = container?.querySelector(`[data-tr-elec-input="${rowNo}:K"]`);
+      if (numberInput) numberInput.value = "";
+      const agencyDisplay = container?.querySelector(`[data-tr-elec-dielectric-agency="${rowNo}"]`);
+      if (agencyDisplay) agencyDisplay.value = "";
+      const store = spec ? trElectricalValues[spec] : null;
+      if (!store || !rowNo) return;
+      delete store[`${rowNo}:K`];
+      delete store[`${rowNo}:K_mode`];
+      delete store[`${rowNo}:K_agency`];
+      delete store[`${rowNo}:K_agencyCustom`];
     }
 
     function trAttr(value) {
@@ -5514,6 +5583,35 @@
       `;
     }
 
+    function trElectricalDielectricInput(spec, rowNo, sampleInfo) {
+      if (sampleInfo && !trElectricalInputAllowed(sampleInfo)) {
+        const label = trElectricalLimitPlaceholder(sampleInfo);
+        return `<input class="tr-electric-limited-input" type="text" disabled value="" aria-label="유전정접 ${trAttr(label)}" />`;
+      }
+      const selected = trElectricalDielectricMode(spec, rowNo);
+      const value = trElectricalValue(spec, rowNo, "K");
+      const agencyText = trElectricalDielectricAgencyText(spec, rowNo);
+      const limitedAttrs = ` data-tr-elec-sample-limited="1" data-tr-elec-limit-name="${trAttr(sampleInfo.name)}" data-tr-elec-limit-label="${trAttr(sampleInfo.label)}" data-tr-elec-limit-allowed="${Number.isFinite(sampleInfo.value) ? sampleInfo.value : ""}"`;
+      const optionHtml = [`<option value="">선택</option>`]
+        .concat([TR_ELEC_DIELECTRIC_MODE_NUMBER, TR_ELEC_DIELECTRIC_MODE_AGENCY]
+          .map(option => `<option value="${option}"${selected === option ? " selected" : ""}>${option}</option>`))
+        .join("");
+      return `
+        <div class="tr-electric-voltage-cell">
+          <select data-tr-elec-input="${rowNo}:K_mode" data-tr-elec-row="${rowNo}" data-tr-elec-col="K" data-tr-elec-dielectric-mode${limitedAttrs}>
+            ${optionHtml}
+          </select>
+          ${selected === TR_ELEC_DIELECTRIC_MODE_AGENCY
+            ? `<input class="tr-electric-agency-display" data-tr-elec-dielectric-agency="${rowNo}" type="text" readonly value="${trAttr(agencyText)}" title="클릭하면 공인기관을 다시 선택할 수 있습니다" />
+               <input type="hidden" data-tr-elec-input="${rowNo}:K_agency" value="${trAttr(trElectricalValue(spec, rowNo, "K_agency"))}" />
+               <input type="hidden" data-tr-elec-input="${rowNo}:K_agencyCustom" value="${trAttr(trElectricalValue(spec, rowNo, "K_agencyCustom"))}" />`
+            : selected === TR_ELEC_DIELECTRIC_MODE_NUMBER
+              ? `<input data-tr-elec-input="${rowNo}:K" data-tr-elec-row="${rowNo}" data-tr-elec-col="K_value" type="number" inputmode="decimal" step="0.001" value="${trAttr(value)}" aria-label="유전정접 수치" />`
+              : ""}
+        </div>
+      `;
+    }
+
     function trElectricalImpulseInput(spec, rowNo, sampleInfo) {
       if (!trElectricalInputAllowed(sampleInfo)) {
         const label = trElectricalLimitPlaceholder(sampleInfo);
@@ -5558,7 +5656,7 @@
             <td>${trElectricalInput(spec, rowNo, "H", "number", "0.01", sampleInfoMap.H)}</td>
             <td>${trElectricalInput(spec, rowNo, "I", "number", "0.01", sampleInfoMap.I)}</td>
             <td>${trElectricalInput(spec, rowNo, "J", "number", "0.01", sampleInfoMap.J)}</td>
-            <td>${trElectricalInput(spec, rowNo, "K", "number", "0.01", sampleInfoMap.K)}</td>
+            <td>${trElectricalDielectricInput(spec, rowNo, sampleInfoMap.K)}</td>
           </tr>
         `;
       }).join("");
@@ -6337,7 +6435,7 @@
               if (col === "H") bad = conductorLimit != null && v > conductorLimit; // 도체저항
               else if (col === "I") bad = !!limits && v > limits.capacitanceMax; // 정전용량
               else if (col === "J") bad = v > TR_ELECTRICAL_PARTIAL_DISCHARGE_MAX; // 부분방전
-              else if (col === "K") bad = v > TR_ELECTRICAL_DIELECTRIC_MAX;   // 유전정접
+              else if (col === "K" || col === "K_value") bad = v > TR_ELECTRICAL_DIELECTRIC_MAX;   // 유전정접
             }
           }
         }
@@ -6359,11 +6457,20 @@
     function getTRElectricalTabInputs(container) {
       if (!container) return [];
       const inputs = Array.from(container.querySelectorAll("[data-tr-elec-input]"))
-        .filter(input => !input.disabled && !input.readOnly && !input.hidden);
+        .filter(input => !input.disabled && !input.readOnly && !input.hidden && input.type !== "hidden");
       const rowNumber = input => Number(input.dataset.trElecRow) || 0;
       const byRow = list => list.sort((a, b) => rowNumber(a) - rowNumber(b));
       const cols = isFRCNCOWMaterial() ? ["A", "B", "C", "E", "L", "F", "H", "I", "J", "K"] : ["A", "B", "C", "E", "F", "H", "I", "J", "K"];
       return cols.flatMap(col => {
+        if (col === "K") {
+          return byRow(inputs.filter(input => input.dataset.trElecCol === "K")).flatMap(select => {
+            const row = select.dataset.trElecRow;
+            const number = inputs.find(input =>
+              input.dataset.trElecCol === "K_value" && input.dataset.trElecRow === row
+            );
+            return number ? [select, number] : [select];
+          });
+        }
         if (col !== "E" && col !== "L") {
           return byRow(inputs.filter(input => input.dataset.trElecCol === col));
         }
@@ -6445,6 +6552,7 @@
           if (!trValidateElectricalRandomSampleInput(input)) {
             input.value = "";
             input.dataset.trPreviousValue = "";
+            if (input.dataset.trElecCol === "K") clearTRElectricalDielectricRow(input.dataset.trElecRow);
             recalcTRElectrical();
             return false;
           }
@@ -6471,13 +6579,44 @@
           toggleTRElectricalVoltageCustom(select);
         });
       });
+      container.querySelectorAll("[data-tr-elec-dielectric-mode]").forEach(select => {
+        select.addEventListener("change", () => {
+          const rowNo = select.dataset.trElecRow;
+          const spec = container.dataset.spec;
+          saveTRElectricalState();
+          const store = trElectricalValues[spec];
+          if (select.value === TR_ELEC_DIELECTRIC_MODE_NUMBER) {
+            if (store) {
+              delete store[`${rowNo}:K_agency`];
+              delete store[`${rowNo}:K_agencyCustom`];
+            }
+            renderTRElectricalStep3({ skipSave: true });
+          } else if (select.value === TR_ELEC_DIELECTRIC_MODE_AGENCY) {
+            if (store) delete store[`${rowNo}:K`];
+            renderTRElectricalStep3({ skipSave: true });
+            openTRElectricalInstituteModal(rowNo);
+          } else {
+            if (store) {
+              delete store[`${rowNo}:K`];
+              delete store[`${rowNo}:K_agency`];
+              delete store[`${rowNo}:K_agencyCustom`];
+            }
+            renderTRElectricalStep3({ skipSave: true });
+          }
+        });
+      });
+      container.querySelectorAll("[data-tr-elec-dielectric-agency]").forEach(display => {
+        display.addEventListener("click", () => {
+          openTRElectricalInstituteModal(display.dataset.trElecDielectricAgency, { preserveOnClose: true });
+        });
+      });
       container.querySelector("[data-tr-dm-auto-open]")?.addEventListener("click", openTRDmAutoModal);
       container.querySelector("[data-tr-slack-fill-open]")?.addEventListener("click", openTRSlackFillModal);
       container.querySelector("[data-tr-voltage-good-all]")?.addEventListener("click", setAllTRElectricalVoltageGood);
     }
 
-    function renderTRElectricalStep3() {
-      saveTRElectricalState();
+    function renderTRElectricalStep3({ skipSave = false } = {}) {
+      if (!skipSave) saveTRElectricalState();
       if (!el.trElectricalContainer) return;
 
       const spec = el.trItemDetail?.value || "";
@@ -6519,10 +6658,10 @@
               ${showImpulse ? '<col style="width:15%;">' : ""}
               <col style="width:10%;">
               <col style="width:10%;">
-              <col style="width:17%;">
-              <col style="width:9%;">
-              <col style="width:9%;">
+              <col style="width:13%;">
               <col style="width:8%;">
+              <col style="width:8%;">
+              <col style="width:14%;">
             </colgroup>
             <thead>
               <tr>
@@ -6771,6 +6910,10 @@
     const trPhysical2Values = {};
     let trInstituteTargetRow = "";
     let trInstituteTargetKind = "result";
+    let trInstituteTargetScope = "physical1";
+    let trInstituteElectricalSpec = "";
+    let trInstituteElectricalRow = "";
+    let trInstitutePreserveOnClose = false;
     let trVolumeRemoteTest = false; // 반도전층 체적저항율 원격시험 여부
 
     function saveTRPhysical1State() {
@@ -7507,30 +7650,64 @@
       }
     }
 
-    function openTRInstituteModal(rowId, targetKind = "result") {
+    function openTRInstituteModal(rowId, targetKind = "result", options = {}) {
+      trInstituteTargetScope = options.scope || "physical1";
+      trInstitutePreserveOnClose = !!options.preserveOnClose;
       trInstituteTargetRow = rowId || "";
       trInstituteTargetKind = targetKind === "mode" ? "mode" : "result";
       if (!trInstituteTargetRow || !el.trInstituteModal) return;
-      const agency = trPhysical1Value(`${trInstituteTargetRow}:agency`) || "KERI";
+      const agency = trInstituteTargetScope === "electrical"
+        ? (trElectricalValue(trInstituteElectricalSpec, trInstituteElectricalRow, "K_agency") || "KERI")
+        : (trPhysical1Value(`${trInstituteTargetRow}:agency`) || "KERI");
+      const custom = trInstituteTargetScope === "electrical"
+        ? trElectricalValue(trInstituteElectricalSpec, trInstituteElectricalRow, "K_agencyCustom")
+        : trPhysical1Value(`${trInstituteTargetRow}:agencyCustom`);
       const isKnown = TR_PUBLIC_INSTITUTE_OPTIONS.includes(agency);
       if (el.trInstituteSelect) el.trInstituteSelect.value = isKnown ? agency : "기타";
-      if (el.trInstituteCustom) el.trInstituteCustom.value = trPhysical1Value(`${trInstituteTargetRow}:agencyCustom`) || (!isKnown ? agency : "");
+      if (el.trInstituteCustom) el.trInstituteCustom.value = custom || (!isKnown ? agency : "");
       toggleTRInstituteCustom();
       el.trInstituteModal.classList.add("active");
+    }
+
+    function openTRElectricalInstituteModal(rowNo, options = {}) {
+      const spec = el.trElectricalContainer?.dataset.spec || el.trItemDetail?.value || "";
+      trInstituteElectricalSpec = spec;
+      trInstituteElectricalRow = String(rowNo || "");
+      if (!spec || !trInstituteElectricalRow) return;
+      openTRInstituteModal(`${spec}:${trInstituteElectricalRow}`, "mode", { ...options, scope: "electrical" });
     }
 
     function closeTRInstituteModal({ restoreSelection = true } = {}) {
       const rowId = trInstituteTargetRow;
       const modalWasOpen = !!el.trInstituteModal?.classList.contains("active");
-      if (modalWasOpen && restoreSelection && rowId) {
+      const shouldRestore = modalWasOpen && restoreSelection && !trInstitutePreserveOnClose;
+      if (shouldRestore && trInstituteTargetScope === "electrical") {
+        const spec = trInstituteElectricalSpec;
+        const rowNo = trInstituteElectricalRow;
+        const store = trElectricalValues[spec];
+        if (store && rowNo) {
+          store[`${rowNo}:K_mode`] = "";
+          delete store[`${rowNo}:K_agency`];
+          delete store[`${rowNo}:K_agencyCustom`];
+        }
+      } else if (shouldRestore && rowId) {
         trPhysical1Values[`${rowId}:${trInstituteTargetKind}`] = "";
         if (trPhysical1Values[`${rowId}:result`] === "공인기관 시험의뢰") trPhysical1Values[`${rowId}:result`] = "";
         delete trPhysical1Values[`${rowId}:agency`];
         delete trPhysical1Values[`${rowId}:agencyCustom`];
       }
       if (el.trInstituteModal) el.trInstituteModal.classList.remove("active");
+      const electricalSpec = trInstituteElectricalSpec;
+      const wasElectrical = trInstituteTargetScope === "electrical";
       trInstituteTargetRow = "";
       trInstituteTargetKind = "result";
+      trInstituteTargetScope = "physical1";
+      trInstituteElectricalSpec = "";
+      trInstituteElectricalRow = "";
+      trInstitutePreserveOnClose = false;
+      if (modalWasOpen && wasElectrical && (document.getElementById("trStep3")?.classList.contains("active") || electricalSpec)) {
+        renderTRElectricalStep3({ skipSave: true });
+      }
       if (modalWasOpen && document.getElementById("trStep4")?.classList.contains("active")) renderTRPhysical1Step4();
     }
 
@@ -7550,6 +7727,19 @@
       if (selected === "기타" && !custom) {
         alert("기타 기관명을 입력해 주세요.");
         el.trInstituteCustom?.focus();
+        return;
+      }
+      if (trInstituteTargetScope === "electrical") {
+        const spec = trInstituteElectricalSpec;
+        const rowNo = trInstituteElectricalRow;
+        if (!spec || !rowNo) return;
+        if (!trElectricalValues[spec]) trElectricalValues[spec] = {};
+        const store = trElectricalValues[spec];
+        store[`${rowNo}:K_mode`] = TR_ELEC_DIELECTRIC_MODE_AGENCY;
+        store[`${rowNo}:K_agency`] = selected;
+        store[`${rowNo}:K_agencyCustom`] = selected === "기타" ? custom : "";
+        delete store[`${rowNo}:K`];
+        closeTRInstituteModal({ restoreSelection: false });
         return;
       }
       trPhysical1Values[`${trInstituteTargetRow}:result`] = "공인기관 시험의뢰";
@@ -10833,6 +11023,7 @@
         if (result.ok) return;
         input.value = "";
         input.dataset.trPreviousValue = "";
+        if (input.dataset.trElecCol === "K") clearTRElectricalDielectricRow(input.dataset.trElecRow);
         cleared += 1;
         if (!firstMessage) firstMessage = result.message;
       });
@@ -10857,8 +11048,28 @@
         const dm = String(aInput.value || "").trim();
         const dmKey = trElectricalDmKey(dm);
         Object.entries(TR_ELEC_RANDOM_GLOW).forEach(([itemId, col]) => {
+          const isTarget = dmKey !== "" && setByCol[col].has(dmKey);
+          if (col === "K") {
+            const modeSelect = container.querySelector(`[data-tr-elec-input="${rowNo}:K_mode"]`);
+            const numberInput = container.querySelector(`[data-tr-elec-input="${rowNo}:K"]`);
+            const agencyDisplay = container.querySelector(`[data-tr-elec-dielectric-agency="${rowNo}"]`);
+            if (modeSelect) modeSelect.classList.toggle("tr-elec-prompt", isTarget && String(modeSelect.value || "").trim() === "");
+            if (numberInput) {
+              numberInput.classList.toggle(
+                "tr-elec-prompt",
+                isTarget && modeSelect?.value === TR_ELEC_DIELECTRIC_MODE_NUMBER && String(numberInput.value || "").trim() === ""
+              );
+            }
+            if (agencyDisplay) {
+              agencyDisplay.classList.toggle(
+                "tr-elec-prompt",
+                isTarget && modeSelect?.value === TR_ELEC_DIELECTRIC_MODE_AGENCY && String(agencyDisplay.value || "").trim() === ""
+              );
+            }
+            return;
+          }
           const cell = container.querySelector(`[data-tr-elec-input="${rowNo}:${col}"]`);
-          if (cell) cell.classList.toggle("tr-elec-prompt", dmKey !== "" && setByCol[col].has(dmKey) && String(cell.value || "").trim() === "");
+          if (cell) cell.classList.toggle("tr-elec-prompt", isTarget && String(cell.value || "").trim() === "");
         });
       });
       // 계약저항 입력칸: 비어 있으면 반짝임
@@ -11185,6 +11396,16 @@
       if (!/^-?(?:\d+\.?\d*|\.\d+)$/.test(raw)) return trReportText(value, fallback);
       return trEsc(trReportNumberString(raw, options));
     }
+    function trReportDecimalDigitCount(value) {
+      const match = String(value ?? "").trim().match(/-?\d+\.(\d+)/);
+      return match ? match[1].length : 0;
+    }
+    function trReportContractAlignedText(contract, specResistance, fallback = "-") {
+      const digits = trReportDecimalDigitCount(specResistance);
+      return digits > 0
+        ? trReportNumberText(contract, fallback, { digits, fixed: true })
+        : trReportNumberText(contract, fallback);
+    }
     function trReportStructureNumberString(value, row) {
       return trReportNumberString(value, row?.reportFixed2 ? { digits: 2, fixed: true } : { digits: 2 });
     }
@@ -11327,6 +11548,7 @@
       if (!(allowed > 0)) return vals;
       const rowCount = trReportElecRowCount(spec);
       for (let rowNo = 1; rowNo <= rowCount; rowNo += 1) {
+        if (col === "K" && trElectricalDielectricMode(spec, rowNo, store) === TR_ELEC_DIELECTRIC_MODE_AGENCY) continue;
         const raw = String(store[`${rowNo}:${col}`] ?? "").trim();
         if (raw === "") continue;
         const v = Number(raw);
@@ -11334,6 +11556,20 @@
         if (vals.length >= allowed) break;
       }
       return vals;
+    }
+    function trReportElecDielectricAgencies(spec, sampleInfoMap = getTRElectricalSampleInfoMap()) {
+      const store = trElectricalValues[spec] || {};
+      const texts = [];
+      const allowed = trReportElecAllowedCount("K", sampleInfoMap);
+      if (!(allowed > 0)) return texts;
+      const rowCount = trReportElecRowCount(spec);
+      for (let rowNo = 1; rowNo <= rowCount; rowNo += 1) {
+        if (trElectricalDielectricMode(spec, rowNo, store) !== TR_ELEC_DIELECTRIC_MODE_AGENCY) continue;
+        const text = trElectricalDielectricAgencyText(spec, rowNo, store);
+        if (text) texts.push(text);
+        if (texts.length >= allowed) break;
+      }
+      return texts;
     }
     function trReportElecRowCount(spec) {
       return getTRElectricalDrumCount();
@@ -11657,8 +11893,14 @@
           : summaryNumber(pdMaxV, 1, 2));
       const insMinV = gVals.length ? Math.min(...gVals) : null;
       const insRes = trReportElecSummaryText(sampleInfoMap.F, insMinV != null ? trCommafy(String(Math.round(insMinV))) : "-");
-      // 일반 유전정접 = Step3 전기특성 유전정접(K) 대표값
-      const diel100 = trReportElecSummaryText(sampleInfoMap.K, dielMaxV != null ? summaryNumber(dielMaxV, 2, 3) : "-");
+      // 일반 유전정접 = Step3 전기특성 유전정접(K) 대표값. 수치입력은 소수 3자리, 공인기관의뢰는 기관명.
+      const dielAgencies = trReportElecDielectricAgencies(spec, sampleInfoMap);
+      const diel100 = trReportElecSummaryText(
+        sampleInfoMap.K,
+        dielMaxV != null
+          ? trReportNumberString(dielMaxV, { digits: 3, fixed: true })
+          : (dielAgencies[0] ? trEsc(dielAgencies[0]) : "-")
+      );
       // 유전정접 온도특성 = FR은 물리1 상온/60/90, 기존 품목은 90/130/상온 데이터 최소~최대
       const dielVals = [];
       const dielTempInfo = trReportP1Info("dielectric90", b.itemName);
@@ -11814,7 +12056,7 @@
       const dielectricRegularLabel = isFRSummary ? "13.2kV" : "100℃";
       const conductorRowsHtml = !showConductor ? "" : showContract
           ? `<tr><td rowspan="2">도체저항 20℃ (Ω/㎞)</td><td>규격저항</td><td>${trReportNumberText(condSpec, "-")}</td><td rowspan="2"${badIf(conductorBad)}>${frElectricalResult(conductorActive, condRes)}</td></tr>
-                <tr><td>계약저항</td><td>${trReportNumberText(contract, "-")}</td></tr>`
+                <tr><td>계약저항</td><td>${trReportContractAlignedText(contract, condSpec)}</td></tr>`
           : `<tr><td>도체저항 20℃ (Ω/㎞)</td><td colspan="2">${trReportNumberText(condSpec, "-")} 이하</td><td${badIf(conductorBad)}>${frElectricalResult(conductorActive, condRes)}</td></tr>`;
       const dielectricRowsHtml = showDielectric100 && showDielectricTemp
         ? `<tr><td rowspan="2">유전정접 (％)</td><td>${dielectricRegularLabel}</td><td>0.4% 이하</td><td${badIf(dielMaxV != null && dielMaxV > TR_ELECTRICAL_DIELECTRIC_MAX)}>${frElectricalResult(dielectric100Active, diel100)}</td></tr>
@@ -12099,10 +12341,12 @@
         const lText = lVal === "기타" ? (cell(r, "L_text") || "기타") : lVal;
         const hv = Number(reportCell(r, "H")); const iv = Number(reportCell(r, "I"));
         const jv = Number(reportCell(r, "J")); const kv = Number(reportCell(r, "K"));
+        const kMode = trElectricalDielectricMode(spec, r, store);
+        const kAgency = kMode === TR_ELEC_DIELECTRIC_MODE_AGENCY ? trElectricalDielectricAgencyText(spec, r, store) : "";
         const badH = trElectricalInputAllowed(sampleInfoMap.H) && Number.isFinite(hv) && conductorLimit != null && hv > conductorLimit;
         const badI = trElectricalInputAllowed(sampleInfoMap.I) && Number.isFinite(iv) && limits.capacitanceMax != null && iv > limits.capacitanceMax;
         const badJ = trElectricalInputAllowed(sampleInfoMap.J) && Number.isFinite(jv) && jv > TR_ELECTRICAL_PARTIAL_DISCHARGE_MAX;
-        const badK = trElectricalInputAllowed(sampleInfoMap.K) && Number.isFinite(kv) && kv > TR_ELECTRICAL_DIELECTRIC_MAX;
+        const badK = !kAgency && trElectricalInputAllowed(sampleInfoMap.K) && Number.isFinite(kv) && kv > TR_ELECTRICAL_DIELECTRIC_MAX;
         const badG = fTarget && Number.isFinite(g) && limits.insulationMin != null && g < limits.insulationMin;
         const b2 = c => c ? ' class="tr-rpt-bad"' : "";
         rows.push(`<tr>
@@ -12116,7 +12360,7 @@
             <td${b2(badH)}>${trReportNumberText(reportCell(r, "H"), "")}</td>
             <td${b2(badI)}>${trReportNumberText(reportCell(r, "I"), "")}</td>
             <td${b2(badJ)}>${trReportNumberText(reportCell(r, "J"), "")}</td>
-            <td${b2(badK)}>${trReportNumberText(reportCell(r, "K"), "")}</td>
+            <td${b2(badK)}>${kAgency ? trEsc(kAgency).replace(/(공인기관의뢰)\s*(\([^)]*\))/, "$1<br>$2") : trReportNumberText(reportCell(r, "K"), "")}</td>
           </tr>`);
       }
       if (!cnt) rows.push(`<tr><td colspan="${showImpulse ? 11 : 10}">입력된 데이터가 없습니다.</td></tr>`);
@@ -12767,10 +13011,13 @@
             missingTargets: targets.filter(value => !presentKeys.has(trElectricalDmKey(value))),
           };
         };
+        const colHasValue = (col, r) => col === "K"
+          ? trElectricalDielectricHasEntry(spec, r, store)
+          : filled(store[`${r}:${col}`]);
         const colCount = (col, targetInfo = colTargetInfo(col)) => {
           let f = 0;
           for (let r = 1; r <= drumCount; r++) {
-            if (!filled(store[`${r}:${col}`])) continue;
+            if (!colHasValue(col, r)) continue;
             const rowKey = trElectricalDmKey(store[`${r}:A`]);
             if (rowKey && targetInfo.targetKeys.has(rowKey)) f++;
           }
@@ -12789,7 +13036,7 @@
             push(`전기특성: ${name} 시료번호 ${targetInfo.missingTargets.join(", ")} D/M No. 현황에 없음`);
           }
           for (let r = 1; r <= drumCount; r++) {
-            if (!filled(store[`${r}:${col}`])) continue;
+            if (!colHasValue(col, r)) continue;
             const dmValue = String(store[`${r}:A`] ?? "").trim();
             const rowKey = trElectricalDmKey(dmValue);
             if (!rowKey || !targetInfo.targetKeys.has(rowKey)) {
@@ -12798,6 +13045,14 @@
             }
           }
           if (matchedCount < req) push(`전기특성: ${name} (${matchedCount}/${req})`);
+          if (col === "K") {
+            for (let r = 1; r <= drumCount; r++) {
+              if (trElectricalDielectricMode(spec, r, store) !== TR_ELEC_DIELECTRIC_MODE_AGENCY) continue;
+              if (trElectricalDielectricAgencyText(spec, r, store)) continue;
+              push("전기특성: 유전정접 공인기관 미선택");
+              break;
+            }
+          }
         });
         for (let r = 1; r <= drumCount; r++) { if (!filled(store[`${r}:E`])) { push("전기특성: 내전압 미선택 행 있음"); break; } }
         for (let r = 1; r <= drumCount; r++) {
