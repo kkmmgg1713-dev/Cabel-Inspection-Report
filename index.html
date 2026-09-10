@@ -11692,6 +11692,23 @@
     }
     function trReportP1CombinedStatus(ids, fallback = "-") {
       const values = [];
+      const resultKinds = new Set();
+      const resultRowIds = new Set();
+      const recordResult = (id, value) => {
+        const text = String(value || "").trim();
+        if (!text) return;
+        // 같은 판정의 띄어쓰기와 '해당없음' 표기는 하나의 결과로 비교한다.
+        const compact = text.replace(/\s+/g, "");
+        const kind = compact === "해당없음" || compact === "해당사항없음"
+          ? "해당사항 없음"
+          : compact === "양호" || compact === "불량" ? compact : text;
+        resultKinds.add(kind);
+        resultRowIds.add(id);
+      };
+      const summary = (text, bad = false) => ({
+        text: resultRowIds.size > 1 && resultKinds.size > 1 ? `${text} 등` : text,
+        bad,
+      });
       let hasBad = false;
       let applicableCount = 0;
       let hasNotApplicable = false;
@@ -11700,28 +11717,30 @@
         const row = trReportP1Row(id);
         const info = trReportP1Info(id);
         if (!row) return;
-        if (info.status === "na") { hasNotApplicable = true; return; }
-        if (info.status === "omit") { hasOmitted = true; return; }
+        if (info.status === "na") { hasNotApplicable = true; recordResult(id, "해당사항 없음"); return; }
+        if (info.status === "omit") { hasOmitted = true; recordResult(id, "생략"); return; }
         if (info.status !== "ok") return;
         applicableCount += 1;
         for (let sampleNo = 1; sampleNo <= info.count; sampleNo++) {
-          if (trReportP1ResultBad(row, sampleNo)) hasBad = true;
+          const bad = trReportP1ResultBad(row, sampleNo);
+          if (bad) hasBad = true;
           const value = trReportP1Result(id, sampleNo);
           if (value) values.push(value);
+          recordResult(id, bad ? "불량" : value);
         }
       });
-      if (hasBad) return { text: "불 량", bad: true };
+      if (hasBad) return summary("불 량", true);
       const external = values.find(value => String(value).startsWith("공인기관 시험의뢰"));
-      if (external) return { text: external, bad: false };
+      if (external) return summary(external);
       const custom = values.find(value => !["양호", "해당사항 없음", "해당없음"].includes(value));
-      if (custom) return { text: custom, bad: false };
-      if (values.some(value => value === "양호")) return { text: "양 호", bad: false };
+      if (custom) return summary(custom);
+      if (values.some(value => value === "양호")) return summary("양 호");
       if (values.length && values.every(value => value === "해당사항 없음" || value === "해당없음")) {
-        return { text: "해당사항 없음", bad: false };
+        return summary("해당사항 없음");
       }
-      if (applicableCount === 0 && hasOmitted) return { text: "생략", bad: false };
-      if (applicableCount === 0 && hasNotApplicable) return { text: "해당사항 없음", bad: false };
-      return { text: fallback, bad: false };
+      if (applicableCount === 0 && hasOmitted) return summary("생략");
+      if (applicableCount === 0 && hasNotApplicable) return summary("해당사항 없음");
+      return summary(fallback);
     }
     // 체적저항율 표기: 1 이상 정수 / 1 미만 소수 첫째자리
     function trReportVolFmt(v) {
