@@ -4683,6 +4683,17 @@
       return s[`${key}Display`] ?? s[key];
     }
 
+    // 표시된 기준값보다 한 자리 더 표시한다. 여러 기준은 가장 상세한 자릿수를 따른다.
+    function structureResultDigits(criteriaTexts, fallback = 2) {
+      const numbers = criteriaTexts.flatMap(text => String(text).match(/\d+(?:\.\d+)?/g) || []);
+      if (!numbers.length) return fallback;
+      return Math.max(...numbers.map(value => (value.split(".")[1] || "").length)) + 1;
+    }
+
+    function trStructureResultDigits(row, criteria = getTRStructureCriteria()) {
+      return criteria && row?.result ? structureResultDigits(row.criteria?.(criteria) || []) : 2;
+    }
+
     function trNormalizeStructureDirection(value) {
       return String(value || "")
         .trim()
@@ -4707,20 +4718,20 @@
     }
 
     const TR_STRUCTURE_TABLE_ROWS = [
-      { id: "cableOuter", title: "케이블 외경", mode: "six", inputLabel: "측정치", criteria: s => [`최대 ${s.cableOuterMax}mm ↓`, `표준 ${s.cableOuterStd}mm${s.cableOuterStdReference === false ? "" : "(참고)"}`], resultLabel: "최  대", result: "max", reportFixed2: true },
-      { id: "sheathThickness", title: "외피 두께", mode: "six", inputLabel: "측정치", criteria: s => s.sheathStandard != null ? [`표준 ${s.sheathStandard.toFixed(1)}mm`, `최소 ${s.sheathMin.toFixed(1)}mm ↑`] : [`최대 ${s.sheathMax}mm ↓`, `최소 ${s.sheathMin}mm ↑`], resultLabel: "결  과", result: "range", reportFixed2: true },
+      { id: "cableOuter", title: "케이블 외경", mode: "six", inputLabel: "측정치", criteria: s => [`최대 ${s.cableOuterMax}mm ↓`, `표준 ${s.cableOuterStd}mm${s.cableOuterStdReference === false ? "" : "(참고)"}`], resultLabel: "최  대", result: "max" },
+      { id: "sheathThickness", title: "외피 두께", mode: "six", inputLabel: "측정치", criteria: s => s.sheathStandard != null ? [`표준 ${s.sheathStandard.toFixed(1)}mm`, `최소 ${s.sheathMin.toFixed(1)}mm ↑`] : [`최대 ${s.sheathMax}mm ↓`, `최소 ${s.sheathMin}mm ↑`], resultLabel: "결  과", result: "range" },
       { id: "neutralDirection", title: "꼬임 방향(중성선)", mode: "singleText", inputLabel: "방  향", criteria: s => s.neutralDirection ? [s.neutralDirection] : [] },
       { id: "neutralCount", title: s => `중성선 수(${s.neutralCount}EA)`, mode: "single", inputLabel: "소선수", criteria: () => [] },
       { id: "neutralPitch", title: "피치(중성선)", mode: "pitch", inputLabel: "6~10배", criteria: () => [] },
-      { id: "neutralWireDiameter", title: "소선경(중성선)", mode: "six", inputLabel: "측정치", criteria: s => [`${s.neutralWireNominalDisplay ?? s.neutralWireNominal.toFixed(2)}±0.03mm`, `(${s.neutralWireMin.toFixed(2)}~${s.neutralWireMax.toFixed(2)})`], resultLabel: "평  균", result: "avg", reportFixed2: true },
-      { id: "neutralTotalArea", title: "중성선 총단면적", mode: "formula", inputLabel: "측정치", criteria: s => [`${trStructureCriterionDisplay(s, "neutralAreaMin")} ㎟↑`], result: "neutralArea", reportFixed2: true },
-      { id: "externalSemiOuter", title: "외부 반도전층\n외경", mode: "six", inputLabel: "측정치", criteria: s => s.externalSemiOuterMin == null ? [] : [`최소 ${trStructureCriterionDisplay(s, "externalSemiOuterMin")}mm ↑`], resultLabel: "최  소", result: "min", reportFixed2: true },
-      { id: "insulationOuter", title: "절연층 외경", mode: "six", inputLabel: "측정치", criteria: s => s.insulationOuterNominal != null ? [`${s.insulationOuterNominal.toFixed(1)}±${s.insulationOuterTolerance.toFixed(1)}mm`, `(${s.insulationOuterMin.toFixed(1)}~${s.insulationOuterMax.toFixed(1)})`] : [`최대 ${s.insulationOuterMax}mm ↓`, `최소 ${s.insulationOuterMin}mm ↑`], resultLabel: "결  과", result: "range", reportFixed2: true },
-      { id: "externalSemiThickness", title: "외부 반도전층 두께", mode: "six", inputLabel: "측정치", criteria: s => s.externalSemiThicknessStandard != null ? [`표준 ${s.externalSemiThicknessStandard.toFixed(1)}mm`, `최소 ${s.externalSemiThicknessMin.toFixed(1)}mm ↑`] : [`최대 ${s.externalSemiThicknessMax}mm ↓`, `최소 ${s.externalSemiThicknessMin}mm ↑`], resultLabel: "결  과", result: "range", reportFixed2: true },
-      { id: "insulationThickness", title: "절연층 두께", mode: "six", inputLabel: "측정치", criteria: s => s.insulationThicknessAverageMin != null ? [`평균 ${trStructureCriterionDisplay(s, "insulationThicknessAverageMin")}mm ↑`, `최소 ${s.insulationThicknessMin.toFixed(2)}mm ↑`] : [`최대 ${s.insulationThicknessMax}mm ↓`, `최소 ${s.insulationThicknessMin}mm ↑`], resultLabel: "결  과", result: "range", reportFixed2: true },
-      { id: "internalSemiThickness", title: "내부 반도전층 두께", mode: "six", inputLabel: "측정치", criteria: s => s.internalSemiThicknessStandard != null ? [`표준 ${s.internalSemiThicknessStandard.toFixed(1)}mm`, `최소 ${s.internalSemiThicknessMin.toFixed(1)}mm ↑`] : [`최소 ${trStructureCriterionDisplay(s, "internalSemiThicknessMin")}mm ↑`], resultLabel: "최  소", result: "min", reportFixed2: true },
-      { id: "neutralPressedDepth", title: "외부 반도전층\n중성선 눌린 깊이", mode: "six", inputLabel: "측정치", criteria: s => s.neutralPressedDepthMax == null ? [] : [`${s.neutralPressedDepthMax}mm 이내`], resultLabel: "최  대", result: "max", reportFixed2: true },
-      { id: "conductorOuter", title: "도체 외경", mode: "six", inputLabel: "측정치", criteria: s => [`${s.conductorOuterNominal.toFixed(1)}±${s.conductorOuterNominal >= 29 ? "0.5" : s.conductorOuterNominal >= 17 ? "0.3" : "0.2"}mm`, `(${s.conductorOuterMin.toFixed(1)}~${s.conductorOuterMax.toFixed(1)})`], resultLabel: "평  균", result: "avg", reportFixed2: true },
+      { id: "neutralWireDiameter", title: "소선경(중성선)", mode: "six", inputLabel: "측정치", criteria: s => [`${s.neutralWireNominalDisplay ?? s.neutralWireNominal.toFixed(2)}±0.03mm`, `(${s.neutralWireMin.toFixed(2)}~${s.neutralWireMax.toFixed(2)})`], resultLabel: "평  균", result: "avg" },
+      { id: "neutralTotalArea", title: "중성선 총단면적", mode: "formula", inputLabel: "측정치", criteria: s => [`${trStructureCriterionDisplay(s, "neutralAreaMin")} ㎟↑`], result: "neutralArea" },
+      { id: "externalSemiOuter", title: "외부 반도전층\n외경", mode: "six", inputLabel: "측정치", criteria: s => s.externalSemiOuterMin == null ? [] : [`최소 ${trStructureCriterionDisplay(s, "externalSemiOuterMin")}mm ↑`], resultLabel: "최  소", result: "min" },
+      { id: "insulationOuter", title: "절연층 외경", mode: "six", inputLabel: "측정치", criteria: s => s.insulationOuterNominal != null ? [`${s.insulationOuterNominal.toFixed(1)}±${s.insulationOuterTolerance.toFixed(1)}mm`, `(${s.insulationOuterMin.toFixed(1)}~${s.insulationOuterMax.toFixed(1)})`] : [`최대 ${s.insulationOuterMax}mm ↓`, `최소 ${s.insulationOuterMin}mm ↑`], resultLabel: "결  과", result: "range" },
+      { id: "externalSemiThickness", title: "외부 반도전층 두께", mode: "six", inputLabel: "측정치", criteria: s => s.externalSemiThicknessStandard != null ? [`표준 ${s.externalSemiThicknessStandard.toFixed(1)}mm`, `최소 ${s.externalSemiThicknessMin.toFixed(1)}mm ↑`] : [`최대 ${s.externalSemiThicknessMax}mm ↓`, `최소 ${s.externalSemiThicknessMin}mm ↑`], resultLabel: "결  과", result: "range" },
+      { id: "insulationThickness", title: "절연층 두께", mode: "six", inputLabel: "측정치", criteria: s => s.insulationThicknessAverageMin != null ? [`평균 ${trStructureCriterionDisplay(s, "insulationThicknessAverageMin")}mm ↑`, `최소 ${s.insulationThicknessMin.toFixed(2)}mm ↑`] : [`최대 ${s.insulationThicknessMax}mm ↓`, `최소 ${s.insulationThicknessMin}mm ↑`], resultLabel: "결  과", result: "range" },
+      { id: "internalSemiThickness", title: "내부 반도전층 두께", mode: "six", inputLabel: "측정치", criteria: s => s.internalSemiThicknessStandard != null ? [`표준 ${s.internalSemiThicknessStandard.toFixed(1)}mm`, `최소 ${s.internalSemiThicknessMin.toFixed(1)}mm ↑`] : [`최소 ${trStructureCriterionDisplay(s, "internalSemiThicknessMin")}mm ↑`], resultLabel: "최  소", result: "min" },
+      { id: "neutralPressedDepth", title: "외부 반도전층\n중성선 눌린 깊이", mode: "six", inputLabel: "측정치", criteria: s => s.neutralPressedDepthMax == null ? [] : [`${s.neutralPressedDepthMax}mm 이내`], resultLabel: "최  대", result: "max" },
+      { id: "conductorOuter", title: "도체 외경", mode: "six", inputLabel: "측정치", criteria: s => [`${s.conductorOuterNominal.toFixed(1)}±${s.conductorOuterNominal >= 29 ? "0.5" : s.conductorOuterNominal >= 17 ? "0.3" : "0.2"}mm`, `(${s.conductorOuterMin.toFixed(1)}~${s.conductorOuterMax.toFixed(1)})`], resultLabel: "평  균", result: "avg" },
       { id: "conductorDirection", title: "꼬임 방향(도체)", mode: "singleText", inputLabel: "방  향", criteria: s => s.conductorDirection ? [s.conductorDirection] : [] },
       { id: "conductorPitch", title: "피치(도체)", mode: "pitch", inputLabel: "20배↓", criteria: () => [] },
     ];
@@ -7773,19 +7784,20 @@
 
     function trResultValue(row, sampleNo) {
       const nums = trNumbers(row.id, sampleNo);
+      const format = value => value.toFixed(trStructureResultDigits(row));
       const averageMinimum = trStructureAverageMinimum(getTRStructureCriteria(), row.id);
       if (averageMinimum != null) {
         if (!nums.length) return "-";
         const average = nums.reduce((sum, value) => sum + value, 0) / nums.length;
-        return trFmt(average);
+        return format(average);
       }
-      if (row.result === "max") return nums.length ? trFmt(Math.max(...nums)) : "-";
-      if (row.result === "min") return nums.length ? trFmt(Math.min(...nums)) : "-";
-      if (row.result === "avg") return nums.length ? trFmt(nums.reduce((a, b) => a + b, 0) / nums.length) : "-";
-      if (row.result === "range") return nums.length ? `${trFmt(Math.min(...nums))} ~ ${trFmt(Math.max(...nums))}` : "-";
+      if (row.result === "max") return nums.length ? format(Math.max(...nums)) : "-";
+      if (row.result === "min") return nums.length ? format(Math.min(...nums)) : "-";
+      if (row.result === "avg") return nums.length ? format(nums.reduce((a, b) => a + b, 0) / nums.length) : "-";
+      if (row.result === "range") return nums.length ? `${format(Math.min(...nums))} ~ ${format(Math.max(...nums))}` : "-";
       if (row.result === "neutralArea") {
         const area = trNeutralAreaValue(sampleNo);
-        return Number.isFinite(area) ? trFmt(area) : "-";
+        return Number.isFinite(area) ? format(area) : "-";
       }
       return "-";
     }
@@ -7877,7 +7889,8 @@
     }
 
     function trCellInput(row, sampleNo, idx, type = "number") {
-      const step = type === "number" ? ' step="0.01"' : "";
+      const digits = trStructureResultDigits(row);
+      const step = type === "number" ? ` step="${(10 ** -digits).toFixed(digits)}"` : "";
       const saved = trStructureValues[`${row.id}#${sampleNo}#${idx}`];
       const valAttr = saved != null ? ` value="${trAttr(saved)}"` : "";
       return `<input data-tr-row="${row.id}" data-tr-kind="measure" data-tr-drum="${sampleNo}" data-tr-idx="${idx}" type="${type}"${step}${valAttr} aria-label="${typeof row.title === "function" ? "TR 구조" : row.title} 시료 ${sampleNo} 입력 ${idx}" />`;
@@ -8817,6 +8830,22 @@
     function cvFixed(value, digits = 2) {
       return Number.isFinite(value) ? Number(value).toFixed(digits) : "-";
     }
+    function cvStructureCriterionText(value) {
+      return cvFixed(value, 2);
+    }
+    function cvStructureResultDigits(key, c = cvCurrentCriteria()) {
+      const values = key.startsWith("finishedOuter") ? [c.finishedOuter]
+        : key.startsWith("strandOuter") ? [c.bare]
+        : key.startsWith("insulationThickness") ? [c.insulationMin, c.insulation]
+        : key.startsWith("sheathThickness") ? [c.sheath, c.sheathMin] : [];
+      return structureResultDigits(values.map(cvStructureCriterionText));
+    }
+    function cvStructureFieldDisplay(field) {
+      const raw = String(field.value || "");
+      const value = cvStrictNumber(raw);
+      return field.hasAttribute("data-cv-structure-number") && raw.trim() && Number.isFinite(value)
+        ? cvFixed(value, cvStructureResultDigits(field.dataset.cvKey || "")) : raw;
+    }
     function cvSamplingInputsReady() {
       const drum = Number(cvEl("cvDrumQty")?.value);
       const grade = cvEl("cvQualityGrade")?.value || "";
@@ -9087,8 +9116,8 @@
     function cvTextInput(key, extra = "") {
       const saved = cvSavedValue(key);
       const number = key.startsWith("strandOuter") ? cvStrictNumber(saved) : cvNumberFromValue(saved);
-      const display = extra.includes("data-cv-fixed2") && String(saved).trim() !== "" && Number.isFinite(number)
-        ? number.toFixed(2)
+      const display = extra.includes("data-cv-structure-number") && String(saved).trim() !== "" && Number.isFinite(number)
+        ? number.toFixed(cvStructureResultDigits(key))
         : saved;
       return `<input data-cv-key="${trAttr(key)}" type="text" value="${trAttr(display)}"${extra} />`;
     }
@@ -9219,13 +9248,13 @@
     function cvFinishedOuterCells(sampleStart = 1, count = 4) {
       return Array.from({ length: count }, (_, index) => {
         const sample = sampleStart + index;
-        return `<td colspan="3">${cvTextInput(`finishedOuter#${sample}`, ' data-cv-fixed2 inputmode="decimal" placeholder="완성품 외경" title="완성품 외경"')}</td>`;
+        return `<td colspan="3">${cvTextInput(`finishedOuter#${sample}`, ' data-cv-structure-number inputmode="decimal" placeholder="완성품 외경" title="완성품 외경"')}</td>`;
       }).join("");
     }
     function cvStrandOuterInputCells(label, sampleStart = 1, count = 4) {
       return Array.from({ length: count }, (_, index) => {
         const sample = sampleStart + index;
-        return `<td colspan="3">${cvTextInput(cvStrandOuterKey(label, sample), ' data-cv-fixed2 inputmode="decimal" placeholder="연선경" title="연선경"')}</td>`;
+        return `<td colspan="3">${cvTextInput(cvStrandOuterKey(label, sample), ' data-cv-structure-number inputmode="decimal" placeholder="연선경" title="연선경"')}</td>`;
       }).join("");
     }
     function cvStrandOuterRows(c, sampleCount = 4) {
@@ -9233,7 +9262,7 @@
       return labels.map((label, index) => `
         <tr>
           ${index === 0 ? `<td rowspan="${labels.length}">연선경</td>` : ""}
-          <td>${label ? `<strong>${trEsc(label)}</strong><br>` : ""}${cvFixed(c.bare, 2)} mm</td>
+          <td>${label ? `<strong>${trEsc(label)}</strong><br>` : ""}${cvStructureCriterionText(c.bare)} mm</td>
           ${cvStrandOuterInputCells(label, 1, sampleCount)}
         </tr>`).join("");
     }
@@ -9283,7 +9312,7 @@
         return [1, 2, 3].map(colIndex => {
           const idx = inputRow * 3 + colIndex;
           const key = `${rowKey}#${sample}#${idx}`;
-          return `<td>${cvTextInput(key, ` data-cv-six-row="${trAttr(rowKey)}" data-cv-six-sample="${sample}" data-cv-fixed2 inputmode="decimal"`)}</td>`;
+          return `<td>${cvTextInput(key, ` data-cv-six-row="${trAttr(rowKey)}" data-cv-six-sample="${sample}" data-cv-structure-number inputmode="decimal"`)}</td>`;
         }).join("");
       }).join("");
     }
@@ -9307,7 +9336,7 @@
         const titleCell = labelIndex === 0 ? `<td rowspan="${rowSpan}">절연체 두께</td>` : "";
         const colorText = label ? `<strong>${trEsc(label)}</strong><br>` : "";
         return `
-          <tr>${titleCell}<td rowspan="2">${colorText}최소 ${cvFixed(c.insulationMin, 2)} mm↑<br>평균 ${cvFixed(c.insulation, 2)} mm↑</td>${cvSixMeasureCells(key, 0, 1, sampleCount)}</tr>
+          <tr>${titleCell}<td rowspan="2">${colorText}최소 ${cvStructureCriterionText(c.insulationMin)} mm↑<br>평균 ${cvStructureCriterionText(c.insulation)} mm↑</td>${cvSixMeasureCells(key, 0, 1, sampleCount)}</tr>
           <tr>${cvSixMeasureCells(key, 1, 1, sampleCount)}</tr>
           <tr><td>${label ? `${trEsc(label)} ` : ""}평균</td>${cvSixAverageCells(key, 1, sampleCount)}</tr>`;
       }).join("");
@@ -9420,7 +9449,7 @@
           .filter(input => input.dataset.cvSixRow === rowKey && input.dataset.cvSixSample === sample)
           .map(input => cvNumberFromValue(input.value))
           .filter(Number.isFinite);
-        result.value = nums.length ? cvFixed(nums.reduce((sum, value) => sum + value, 0) / nums.length, 2) : "-";
+        result.value = nums.length ? cvFixed(nums.reduce((sum, value) => sum + value, 0) / nums.length, cvStructureResultDigits(rowKey)) : "-";
       });
       updateCVTestHighlights();
     }
@@ -9499,10 +9528,7 @@
         };
         field.addEventListener("input", sync);
         field.addEventListener("change", () => {
-          if (field.hasAttribute("data-cv-fixed2") && String(field.value || "").trim() !== "") {
-            const value = cvStrictNumber(field.value);
-            if (Number.isFinite(value)) field.value = value.toFixed(2);
-          }
+          field.value = cvStructureFieldDisplay(field);
           const rule = cvNumericFieldRule(field);
           if (rule && String(field.value || "").trim() !== "") {
             const value = cvStrictNumber(field.value);
@@ -9563,13 +9589,13 @@
             <tbody>
               <tr><td>외관검사</td><td>KS C IEC 60502-1</td><td colspan="${sampleCount * 3}">${cvDecisionSelect("appearance#all")}</td></tr>
               <tr><td>케이블표시</td><td>KS C IEC 60502-1</td><td colspan="${sampleCount * 3}">${cvTextInput("mark#all", ' placeholder="케이블표시 입력"')}</td></tr>
-              <tr><td>완성품 외경</td><td>${cvFixed(c.finishedOuter, 2)} mm</td>${cvFinishedOuterCells(1, sampleCount)}</tr>
+              <tr><td>완성품 외경</td><td>${cvStructureCriterionText(c.finishedOuter)} mm</td>${cvFinishedOuterCells(1, sampleCount)}</tr>
               ${cvStrandOuterRows(c, sampleCount)}
               <tr><td>소선수/모양</td><td>${trEsc(c.conductor)}</td>${cvDecisionCells("conductorShape", 1, sampleCount)}</tr>
               <tr><td>연선방향</td><td>우연(S) 좌연(Z)</td>${cvDirectionCells(1, sampleCount)}</tr>
               ${pitchRows}
               ${cvInsulationRows(c, sampleCount)}
-              ${cvSixRows("sheathThickness", "시스 두께", `표준 ${cvFixed(c.sheath, 2)} mm<br>최소 ${cvFixed(c.sheathMin, 2)} mm↑`, 1, sampleCount)}
+              ${cvSixRows("sheathThickness", "시스 두께", `표준 ${cvStructureCriterionText(c.sheath)} mm<br>최소 ${cvStructureCriterionText(c.sheathMin)} mm↑`, 1, sampleCount)}
             </tbody>
           </table>
         </div>`;
@@ -10173,7 +10199,7 @@
       clone.querySelectorAll("table").forEach(table => { table.style.minWidth = "0"; table.style.width = "100%"; });
       clone.querySelectorAll("input,select,textarea").forEach(field => {
         const span = document.createElement("span");
-        span.textContent = field.value || "-";
+        span.textContent = cvStructureFieldDisplay(field) || "-";
         if (field.classList.contains("tr-physical-bad")) span.classList.add("cv-rpt-bad");
         field.replaceWith(span);
       });
@@ -10296,7 +10322,7 @@
           ? "양호(전량)"
           : field.value === "양호" && isVoltageResult && core !== "1C"
             ? "양호(전량)"
-            : (field.value || "-");
+            : (cvStructureFieldDisplay(field) || "-");
         if (field.classList.contains("tr-physical-bad")) span.classList.add("cv-rpt-bad");
         field.replaceWith(span);
       });
@@ -11406,30 +11432,31 @@
         ? trReportNumberText(contract, fallback, { digits, fixed: true })
         : trReportNumberText(contract, fallback);
     }
-    function trReportStructureNumberString(value, row) {
-      return trReportNumberString(value, row?.reportFixed2 ? { digits: 2, fixed: true } : { digits: 2 });
+    function trReportStructureNumberString(value, row, criteria = getTRStructureCriteria()) {
+      return trReportNumberString(value, row?.result
+        ? { digits: trStructureResultDigits(row, criteria), fixed: true } : { digits: 2 });
     }
-    function trReportStructureResultValue(row, sampleNo) {
+    function trReportStructureResultValue(row, sampleNo, criteria = getTRStructureCriteria()) {
       const nums = trNumbers(row.id, sampleNo);
-      const averageMinimum = trStructureAverageMinimum(getTRStructureCriteria(), row.id);
+      const averageMinimum = trStructureAverageMinimum(criteria, row.id);
       if (averageMinimum != null) {
         if (!nums.length) return "-";
         const average = nums.reduce((sum, value) => sum + value, 0) / nums.length;
-        return trReportStructureNumberString(average, row);
+        return trReportStructureNumberString(average, row, criteria);
       }
-      if (row.result === "max") return nums.length ? trReportStructureNumberString(Math.max(...nums), row) : "-";
-      if (row.result === "min") return nums.length ? trReportStructureNumberString(Math.min(...nums), row) : "-";
+      if (row.result === "max") return nums.length ? trReportStructureNumberString(Math.max(...nums), row, criteria) : "-";
+      if (row.result === "min") return nums.length ? trReportStructureNumberString(Math.min(...nums), row, criteria) : "-";
       if (row.result === "avg") {
-        return nums.length ? trReportStructureNumberString(nums.reduce((a, b) => a + b, 0) / nums.length, row) : "-";
+        return nums.length ? trReportStructureNumberString(nums.reduce((a, b) => a + b, 0) / nums.length, row, criteria) : "-";
       }
       if (row.result === "range") {
         return nums.length
-          ? `${trReportStructureNumberString(Math.min(...nums), row)} ~ ${trReportStructureNumberString(Math.max(...nums), row)}`
+          ? `${trReportStructureNumberString(Math.min(...nums), row, criteria)} ~ ${trReportStructureNumberString(Math.max(...nums), row, criteria)}`
           : "-";
       }
       if (row.result === "neutralArea") {
         const area = trNeutralAreaValue(sampleNo);
-        return Number.isFinite(area) ? trReportStructureNumberString(area, row) : "-";
+        return Number.isFinite(area) ? trReportStructureNumberString(area, row, criteria) : "-";
       }
       return "-";
     }
@@ -12191,7 +12218,7 @@
             if (bounds.max != null && num > bounds.max) bad = true;
           }
         }
-        const disp = (raw !== "" && Number.isFinite(num)) ? trReportStructureNumberString(num, row) : raw;
+        const disp = (raw !== "" && Number.isFinite(num)) ? trReportStructureNumberString(num, row, criteria) : raw;
         const cs = colspan > 1 ? ` colspan="${colspan}"` : "";
         return `<td${cs}${bad ? ' class="tr-rpt-bad"' : ""}>${trEsc(disp)}</td>`;
       };
@@ -12212,7 +12239,7 @@
             : [3, 4, 5].map(i => valCell(trReportStructRaw(row.id, s)[i] ?? "", row.id)).join("")).join("");
           const rowResult = slots.map(s => {
             const averageBad = s != null && trStructureAverageMinimumBad(criteria, row.id, s);
-            return `<td colspan="3"${averageBad ? ' class="tr-rpt-bad"' : ""}>${s == null ? "" : trEsc(trReportStructureResultValue(row, s))}</td>`;
+            return `<td colspan="3"${averageBad ? ' class="tr-rpt-bad"' : ""}>${s == null ? "" : trEsc(trReportStructureResultValue(row, s, criteria))}</td>`;
           }).join("");
           rowsHtml += `<tr>
               <td rowspan="3" class="tr-struct-itemcell">${itemCellInner}</td>
@@ -12227,7 +12254,7 @@
             if (s == null) return '<td colspan="3"></td>';
             const area = row.result === "neutralArea" ? trNeutralAreaValue(s) : NaN;
             const bad = Number.isFinite(area) && area < criteria.neutralAreaMin;
-            return `<td colspan="3"${bad ? ' class="tr-rpt-bad"' : ""}>${trEsc(trReportStructureResultValue(row, s))}</td>`;
+            return `<td colspan="3"${bad ? ' class="tr-rpt-bad"' : ""}>${trEsc(trReportStructureResultValue(row, s, criteria))}</td>`;
           }).join("");
           rowsHtml += `<tr><td class="tr-struct-itemcell">${itemCellInner}</td><td>결  과</td>${cells}</tr>`;
           return;
