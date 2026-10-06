@@ -12220,7 +12220,7 @@
         }
         const disp = (raw !== "" && Number.isFinite(num)) ? trReportStructureNumberString(num, row, criteria) : raw;
         const cs = colspan > 1 ? ` colspan="${colspan}"` : "";
-        return `<td${cs}${bad ? ' class="tr-rpt-bad"' : ""}>${trEsc(disp)}</td>`;
+        return `<td${cs} class="tr-struct-value${bad ? ' tr-rpt-bad' : ''}">${trEsc(disp)}</td>`;
       };
 
       let rowsHtml = "";
@@ -12239,7 +12239,7 @@
             : [3, 4, 5].map(i => valCell(trReportStructRaw(row.id, s)[i] ?? "", row.id)).join("")).join("");
           const rowResult = slots.map(s => {
             const averageBad = s != null && trStructureAverageMinimumBad(criteria, row.id, s);
-            return `<td colspan="3"${averageBad ? ' class="tr-rpt-bad"' : ""}>${s == null ? "" : trEsc(trReportStructureResultValue(row, s, criteria))}</td>`;
+            return `<td colspan="3" class="tr-struct-value${averageBad ? ' tr-rpt-bad' : ''}">${s == null ? "" : trEsc(trReportStructureResultValue(row, s, criteria))}</td>`;
           }).join("");
           rowsHtml += `<tr>
               <td rowspan="3" class="tr-struct-itemcell">${itemCellInner}</td>
@@ -12254,7 +12254,7 @@
             if (s == null) return '<td colspan="3"></td>';
             const area = row.result === "neutralArea" ? trNeutralAreaValue(s) : NaN;
             const bad = Number.isFinite(area) && area < criteria.neutralAreaMin;
-            return `<td colspan="3"${bad ? ' class="tr-rpt-bad"' : ""}>${trEsc(trReportStructureResultValue(row, s, criteria))}</td>`;
+            return `<td colspan="3" class="tr-struct-value${bad ? ' tr-rpt-bad' : ''}">${trEsc(trReportStructureResultValue(row, s, criteria))}</td>`;
           }).join("");
           rowsHtml += `<tr><td class="tr-struct-itemcell">${itemCellInner}</td><td>결  과</td>${cells}</tr>`;
           return;
@@ -12268,7 +12268,7 @@
             const mDisp = (m !== "" && Number.isFinite(mNum)) ? trReportNumberString(mNum, { digits: 2 }) : m;
             const baeNum = Number(bae);
             const bad = Number.isFinite(baeNum) && (row.id === "neutralPitch" ? (baeNum < 6 || baeNum > 10) : baeNum > 20);
-            return `<td>${trEsc(mDisp)}</td><td colspan="2"${bad ? ' class="tr-rpt-bad"' : ""}>${trEsc(bae ? `${bae}배` : "")}</td>`;
+            return `<td class="tr-struct-value">${trEsc(mDisp)}</td><td colspan="2" class="tr-struct-value${bad ? ' tr-rpt-bad' : ''}">${trEsc(bae ? `${bae}배` : "")}</td>`;
           }).join("");
           rowsHtml += `<tr><td class="tr-struct-itemcell">${itemCellInner}</td><td>${trEsc(row.inputLabel || "")}</td>${cells}</tr>`;
           return;
@@ -12286,13 +12286,13 @@
         rowsHtml += `<tr><td class="tr-struct-itemcell">${itemCellInner}</td><td>${trEsc(row.inputLabel || "")}</td>${cells}</tr>`;
       });
 
-      const sampleCols = Array.from({ length: 12 }, () => '<col style="width:5.5%">').join("");
+      const sampleCols = Array.from({ length: 12 }, () => '<col style="width:5.8333333333%">').join("");
       return `
         <section class="tr-report-page tr-structure-page">
           <div class="tr-rpt-sub">외관 및 구조검사${pageInfo}</div>
           ${trReportHeaderHtml(b)}
           <table class="tr-data-tbl tr-struct-tbl">
-            <colgroup><col style="width:26%"><col style="width:8%">${sampleCols}</colgroup>
+            <colgroup><col style="width:22%"><col style="width:8%">${sampleCols}</colgroup>
             <thead>
               <tr><th colspan="2">전선표시</th><td colspan="12">${trReportText(trStructureWireMark, "")}</td></tr>
               <tr><th colspan="2">외관검사</th><td colspan="12">${trReportText(trStructureAppearance === "불량" ? "불 량" : (trStructureAppearance === "양호" || structureDefaultGood ? "만 족" : ""))}</td></tr>
@@ -12307,7 +12307,7 @@
       const spec = b.spec;
       const criteria = getTRStructureCriteria(spec, b.itemName);
       if (!criteria) return "";
-      const sampleCols = Array.from({ length: 12 }, () => '<col style="width:5.5%">').join("");
+      const sampleCols = Array.from({ length: 12 }, () => '<col style="width:5.8333333333%">').join("");
       const structureDefaultGood = trStructureInputState().status === "none";
       const appearanceText = trStructureAppearance === "불량" ? "불 량" : (trStructureAppearance === "양호" || structureDefaultGood ? "만 족" : "");
       return `
@@ -12315,7 +12315,7 @@
           <div class="tr-rpt-sub">외관 및 구조검사</div>
           ${trReportHeaderHtml(b)}
           <table class="tr-data-tbl tr-struct-tbl">
-            <colgroup><col style="width:26%"><col style="width:8%">${sampleCols}</colgroup>
+            <colgroup><col style="width:22%"><col style="width:8%">${sampleCols}</colgroup>
             <thead>
               <tr><th colspan="2">전선표시</th><td colspan="12">${trReportText(trStructureWireMark, "")}</td></tr>
               <tr><th colspan="2">외관검사</th><td colspan="12">${trReportText(appearanceText)}</td></tr>
@@ -12826,6 +12826,7 @@
             /* 화면에서도 A4 인쇄 폭(210mm - 좌우 여백 30mm)으로 줄바꿈을 계산한다. */
             .tr-structure-page { width:180mm; break-inside:avoid; page-break-inside:avoid; }
             .tr-struct-tbl td, .tr-struct-tbl th { font-size:10.5px; }
+            .tr-struct-tbl .tr-struct-value { white-space:nowrap; word-break:normal; padding-left:2px; padding-right:2px; }
             .tr-struct-itemcell { text-align:center; padding:3px 5px; }
             .tr-struct-item { font-weight:800; line-height:1.35; word-break:keep-all; }
             .tr-struct-crit { font-size:9px; color:#333; margin-top:2px; line-height:1.3; word-break:keep-all; }
